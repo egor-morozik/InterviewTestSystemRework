@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Tag, Question, Choice
+
+from .models import Choice, Question, Tag
 
 
 class TagSerializer(serializers.ModelSerializer):

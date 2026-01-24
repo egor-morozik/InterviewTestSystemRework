@@ -9,37 +9,97 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('attempts', '0001_initial'),
-        ('questions', '0001_initial'),
+        ("attempts", "0001_initial"),
+        ("questions", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ManualGrade',
+            name="ManualGrade",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('score', models.PositiveSmallIntegerField(default=0, help_text='Общий балл (0-максимум)', verbose_name='Ручной балл')),
-                ('comment', models.TextField(blank=True, verbose_name='Комментарий оценивающего')),
-                ('attempt', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='manual_grade', to='attempts.attempt', verbose_name='Приглашение')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "score",
+                    models.PositiveSmallIntegerField(
+                        default=0,
+                        help_text="Общий балл (0-максимум)",
+                        verbose_name="Ручной балл",
+                    ),
+                ),
+                (
+                    "comment",
+                    models.TextField(
+                        blank=True, verbose_name="Комментарий оценивающего"
+                    ),
+                ),
+                (
+                    "attempt",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="manual_grade",
+                        to="attempts.attempt",
+                        verbose_name="Приглашение",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Ручная оценка',
-                'verbose_name_plural': 'Ручные оценки',
+                "verbose_name": "Ручная оценка",
+                "verbose_name_plural": "Ручные оценки",
             },
         ),
         migrations.CreateModel(
-            name='QuestionFeedback',
+            name="QuestionFeedback",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('comment', models.TextField(blank=True, verbose_name='Комментарий оценщика')),
-                ('score', models.PositiveSmallIntegerField(blank=True, null=True, verbose_name='Баллы за вопрос')),
-                ('attempt', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='feedbacks', to='attempts.attempt', verbose_name='Попытка пройти тест')),
-                ('question', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='feedbacks', to='questions.question', verbose_name='Исходный вопрос')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "comment",
+                    models.TextField(blank=True, verbose_name="Комментарий оценщика"),
+                ),
+                (
+                    "score",
+                    models.PositiveSmallIntegerField(
+                        blank=True, null=True, verbose_name="Баллы за вопрос"
+                    ),
+                ),
+                (
+                    "attempt",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="feedbacks",
+                        to="attempts.attempt",
+                        verbose_name="Попытка пройти тест",
+                    ),
+                ),
+                (
+                    "question",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="feedbacks",
+                        to="questions.question",
+                        verbose_name="Исходный вопрос",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Оценка ответа по вопросу',
-                'verbose_name_plural': 'Оценки ответов по вопросу',
-                'unique_together': {('attempt', 'question')},
+                "verbose_name": "Оценка ответа по вопросу",
+                "verbose_name_plural": "Оценки ответов по вопросу",
+                "unique_together": {("attempt", "question")},
             },
         ),
     ]

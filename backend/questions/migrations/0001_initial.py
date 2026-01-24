@@ -8,53 +8,142 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Question',
+            name="Question",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(max_length=100, unique=True, verbose_name='Название вопроса')),
-                ('content', models.TextField(verbose_name='Содержание вопроса')),
-                ('question_type', models.CharField(choices=[('text', 'Текстовый'), ('single_choice', 'Выбор одного варианта'), ('multiple_choice', 'Выбор нескольких вариантов'), ('code', 'Написать код')], default='text', max_length=20, verbose_name='Тип вопроса')),
-                ('question_complexity', models.CharField(choices=[('easy', 'лёгкий'), ('medium', 'средний'), ('hard', 'сложный')], default='easy', max_length=10, verbose_name='Сложность вопроса')),
-                ('extra_data', models.JSONField(blank=True, default=dict, help_text='JSON со специфичными полями (stdin, timeout и т.д.)', verbose_name='Дополнительные параметры вопроса')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "title",
+                    models.CharField(
+                        max_length=100, unique=True, verbose_name="Название вопроса"
+                    ),
+                ),
+                ("content", models.TextField(verbose_name="Содержание вопроса")),
+                (
+                    "question_type",
+                    models.CharField(
+                        choices=[
+                            ("text", "Текстовый"),
+                            ("single_choice", "Выбор одного варианта"),
+                            ("multiple_choice", "Выбор нескольких вариантов"),
+                            ("code", "Написать код"),
+                        ],
+                        default="text",
+                        max_length=20,
+                        verbose_name="Тип вопроса",
+                    ),
+                ),
+                (
+                    "question_complexity",
+                    models.CharField(
+                        choices=[
+                            ("easy", "лёгкий"),
+                            ("medium", "средний"),
+                            ("hard", "сложный"),
+                        ],
+                        default="easy",
+                        max_length=10,
+                        verbose_name="Сложность вопроса",
+                    ),
+                ),
+                (
+                    "extra_data",
+                    models.JSONField(
+                        blank=True,
+                        default=dict,
+                        help_text="JSON со специфичными полями (stdin, timeout и т.д.)",
+                        verbose_name="Дополнительные параметры вопроса",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Вопрос',
-                'verbose_name_plural': 'Вопросы',
-                'ordering': ['-id'],
+                "verbose_name": "Вопрос",
+                "verbose_name_plural": "Вопросы",
+                "ordering": ["-id"],
             },
         ),
         migrations.CreateModel(
-            name='Tag',
+            name="Tag",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(max_length=31, unique=True, verbose_name='Название тега')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "title",
+                    models.CharField(
+                        max_length=31, unique=True, verbose_name="Название тега"
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Тег',
-                'verbose_name_plural': 'Теги',
+                "verbose_name": "Тег",
+                "verbose_name_plural": "Теги",
             },
         ),
         migrations.CreateModel(
-            name='Choice',
+            name="Choice",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('text', models.CharField(max_length=255, verbose_name='Содержимое варианта ответа')),
-                ('is_correct', models.BooleanField(default=False, verbose_name='Правильность ответа')),
-                ('question', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='choices', to='questions.question', verbose_name='Вопрос')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "text",
+                    models.CharField(
+                        max_length=255, verbose_name="Содержимое варианта ответа"
+                    ),
+                ),
+                (
+                    "is_correct",
+                    models.BooleanField(
+                        default=False, verbose_name="Правильность ответа"
+                    ),
+                ),
+                (
+                    "question",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="choices",
+                        to="questions.question",
+                        verbose_name="Вопрос",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Вариант ответа',
-                'verbose_name_plural': 'Варианты ответов',
+                "verbose_name": "Вариант ответа",
+                "verbose_name_plural": "Варианты ответов",
             },
         ),
         migrations.AddField(
-            model_name='question',
-            name='tags',
-            field=models.ManyToManyField(blank=True, related_name='questions', to='questions.tag', verbose_name='Теги'),
+            model_name="question",
+            name="tags",
+            field=models.ManyToManyField(
+                blank=True,
+                related_name="questions",
+                to="questions.tag",
+                verbose_name="Теги",
+            ),
         ),
     ]

@@ -52,17 +52,17 @@ class Question(models.Model):
         "Tag",
         verbose_name="Теги",
         related_name="questions",
-        blank = True,
+        blank=True,
     )
 
     class Meta:
         verbose_name = "Вопрос"
         verbose_name_plural = "Вопросы"
-        ordering = ['-id']
+        ordering = ["-id"]
 
     def __str__(self):
         return f"{self.title}"
-    
+
 
 class Tag(models.Model):
     """
@@ -85,14 +85,14 @@ class Tag(models.Model):
 
 class Choice(models.Model):
     """
-    Модель для специальных вариантов ответов на вопрос типа выбор ответа (-ов) 
+    Модель для специальных вариантов ответов на вопрос типа выбор ответа (-ов)
     """
 
     question = models.ForeignKey(
         Question,
         on_delete=models.CASCADE,
         related_name="choices",
-        verbose_name="Вопрос"
+        verbose_name="Вопрос",
     )
     text = models.CharField(
         "Содержимое варианта ответа",

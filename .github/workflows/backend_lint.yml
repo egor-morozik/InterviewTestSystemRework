@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend  
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install tools
+        run: pip install black isort flake8
+
+      - name: Run Isort
+        run: isort . --check-only --profile black --skip migrations
+
+      - name: Run Black
+        run: black . --check --line-length 120 --exclude migrations
+
+      - name: Run Flake8
+        run: flake8 .

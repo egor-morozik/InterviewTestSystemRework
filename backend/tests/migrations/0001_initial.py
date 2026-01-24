@@ -9,41 +9,95 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('questions', '0001_initial'),
+        ("questions", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Test',
+            name="Test",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(max_length=63, unique=True, verbose_name='Название теста')),
-                ('description', models.TextField(verbose_name='Описание теста')),
-                ('time_limit', models.PositiveSmallIntegerField(default=0, help_text='В минутах. Для бесконечности - 0', verbose_name='Ограничение по времени')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "title",
+                    models.CharField(
+                        max_length=63, unique=True, verbose_name="Название теста"
+                    ),
+                ),
+                ("description", models.TextField(verbose_name="Описание теста")),
+                (
+                    "time_limit",
+                    models.PositiveSmallIntegerField(
+                        default=0,
+                        help_text="В минутах. Для бесконечности - 0",
+                        verbose_name="Ограничение по времени",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Тест',
-                'verbose_name_plural': 'Тесты',
+                "verbose_name": "Тест",
+                "verbose_name_plural": "Тесты",
             },
         ),
         migrations.CreateModel(
-            name='TestQuestion',
+            name="TestQuestion",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('order', models.PositiveSmallIntegerField(default=0, help_text='Чем меньше - тем раньше', verbose_name='Порядок вопроса в тесте')),
-                ('question', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='questions.question', verbose_name='Вопрос')),
-                ('test', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='tests.test', verbose_name='Тест')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "order",
+                    models.PositiveSmallIntegerField(
+                        default=0,
+                        help_text="Чем меньше - тем раньше",
+                        verbose_name="Порядок вопроса в тесте",
+                    ),
+                ),
+                (
+                    "question",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="questions.question",
+                        verbose_name="Вопрос",
+                    ),
+                ),
+                (
+                    "test",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="tests.test",
+                        verbose_name="Тест",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Вопрос в шаблоне',
-                'verbose_name_plural': 'Вопросы в шаблоне',
-                'ordering': ['order'],
-                'unique_together': {('test', 'question')},
+                "verbose_name": "Вопрос в шаблоне",
+                "verbose_name_plural": "Вопросы в шаблоне",
+                "ordering": ["order"],
+                "unique_together": {("test", "question")},
             },
         ),
         migrations.AddField(
-            model_name='test',
-            name='questions',
-            field=models.ManyToManyField(related_name='tests', through='tests.TestQuestion', to='questions.question', verbose_name='Вопросы'),
+            model_name="test",
+            name="questions",
+            field=models.ManyToManyField(
+                related_name="tests",
+                through="tests.TestQuestion",
+                to="questions.question",
+                verbose_name="Вопросы",
+            ),
         ),
     ]

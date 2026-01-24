@@ -1,10 +1,10 @@
+import uuid
+
 from django.db import models
 
 from candidates.models import Candidate
 from questions.models import Question
 from tests.models import Test
-
-import uuid
 
 
 class Attempt(models.Model):
@@ -18,12 +18,12 @@ class Attempt(models.Model):
         editable=False,
         unique=True,
     )
-    
+
     sent = models.BooleanField(
         "Отправлено",
-        default=False, 
+        default=False,
     )
-    
+
     completed = models.BooleanField(
         "Пройден",
         default=False,
@@ -35,7 +35,7 @@ class Attempt(models.Model):
         related_name="attempts",
         verbose_name="Кандидат",
     )
-    
+
     test = models.ForeignKey(
         Test,
         on_delete=models.PROTECT,
@@ -46,7 +46,7 @@ class Attempt(models.Model):
     class Meta:
         verbose_name = "Попытка"
         verbose_name_plural = "Попытки"
-        
+
     def __str__(self):
         return f"Приглашение для {self.candidate.email} - {self.test.title}"
 
@@ -59,10 +59,7 @@ class TabSwitchLog(models.Model):
     event_type = models.CharField(
         "Тип события",
         max_length=10,
-        choices=(
-            ("hidden", "Ушёл"), 
-            ("visible", "Вернулся")
-        ),
+        choices=(("hidden", "Ушёл"), ("visible", "Вернулся")),
     )
 
     attempt = models.ForeignKey(
@@ -74,7 +71,7 @@ class TabSwitchLog(models.Model):
 
     timestamp = models.DateTimeField(
         "Время события",
-        auto_now_add=True, 
+        auto_now_add=True,
     )
 
     class Meta:
@@ -94,7 +91,7 @@ class Answer(models.Model):
     response = models.TextField(
         "Ответ кандидата",
     )
-    
+
     score = models.PositiveSmallIntegerField(
         "Баллы (автооценка)",
         default=0,
@@ -118,6 +115,6 @@ class Answer(models.Model):
         verbose_name = "Ответ"
         verbose_name_plural = "Ответы"
         unique_together = (
-            "attempt", 
+            "attempt",
             "question",
         )

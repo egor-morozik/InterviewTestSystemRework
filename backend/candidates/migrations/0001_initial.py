@@ -7,21 +7,38 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Candidate',
+            name="Candidate",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('full_name', models.CharField(max_length=255, verbose_name='ФИО')),
-                ('email', models.EmailField(max_length=254, unique=True, verbose_name='Электронная почта')),
-                ('vacancy', models.CharField(max_length=100, verbose_name='Претендуемая должность')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("full_name", models.CharField(max_length=255, verbose_name="ФИО")),
+                (
+                    "email",
+                    models.EmailField(
+                        max_length=254, unique=True, verbose_name="Электронная почта"
+                    ),
+                ),
+                (
+                    "vacancy",
+                    models.CharField(
+                        max_length=100, verbose_name="Претендуемая должность"
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Кандидат',
-                'verbose_name_plural': 'Кандидаты',
+                "verbose_name": "Кандидат",
+                "verbose_name_plural": "Кандидаты",
             },
         ),
     ]

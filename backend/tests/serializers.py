@@ -1,6 +1,8 @@
 from rest_framework import serializers
-from .models import Test, TestQuestion
+
 from questions.serializers import QuestionSerializer
+
+from .models import Test, TestQuestion
 
 
 class TestQuestionSerializer(serializers.ModelSerializer):
@@ -18,7 +20,7 @@ class TestQuestionSerializer(serializers.ModelSerializer):
 class TestSerializer(serializers.ModelSerializer):
 
     test_questions = TestQuestionSerializer(
-        many=True, 
+        many=True,
     )
 
     class Meta:
@@ -28,5 +30,5 @@ class TestSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "time_limit",
-            "test_questions", 
+            "test_questions",
         ]
