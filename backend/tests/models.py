@@ -42,12 +42,14 @@ class TestQuestion(models.Model):
     test = models.ForeignKey(
         Test,
         on_delete=models.CASCADE,
+        related_name="test_questions",
         verbose_name="Тест",
     )
 
     question = models.ForeignKey(
         Question,
         on_delete=models.CASCADE,
+        related_name="in_tests",
         verbose_name="Вопрос",
     )
 

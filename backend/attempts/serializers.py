@@ -1,17 +1,54 @@
 from rest_framework import serializers
-from .models import Attempt
+from .models import Attempt, TabSwitchLog, Answer
+
+
+class TabSwitchLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TabSwitchLog
+        fields = [
+            'event_type', 
+            'timestamp',
+        ]
+
+
+class AnswerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Answer
+        fields = [
+            'question', 
+            'response', 
+            'score',
+        ]
+
 
 class AttemptSerializer(serializers.ModelSerializer):
+
+    tab_switches = TabSwitchLogSerializer(
+        many=True, 
+        read_only=True,
+    )
+
+    answers = AnswerSerializer(
+        many=True, 
+        read_only=True,
+    )
     
-    candidate_name = serializers.ReadOnlyField(source='candidate.name')
-    test_title = serializers.ReadOnlyField(source='test.title')
+    test_title = serializers.CharField(source='test.title')
+    candidate_email = serializers.EmailField(source='candidate.email')
 
     class Meta:
         model = Attempt
         fields = [
-            'sent', 
             'unique_link', 
+            'sent', 
             'completed', 
-            'candidate_name', 
-            'test_title',     
+            'candidate', 
+            'candidate_email',
+            'test', 
+            'test_title',
+            'tab_switches', 
+            'answers'
+        ]
+        read_only_fields = [
+            'unique_link',
         ]
