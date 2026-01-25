@@ -1,5 +1,3 @@
-function Questions(){
+export function Questions(){
     return
 }
-
-export default Questions
