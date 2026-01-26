@@ -4,6 +4,6 @@ from .models import Attempt
 from .serializers import AttemptSerializer
 
 
-class TestViewSet(viewsets.ModelViewSet):
+class AttemptViewSet(viewsets.ModelViewSet):
     queryset = Attempt
     serializer_class = AttemptSerializer

@@ -4,6 +4,6 @@ from .models import Candidate
 from .serializers import CandidateSerializer
 
 
-class TestViewSet(viewsets.ModelViewSet):
+class CandidateViewSet(viewsets.ModelViewSet):
     queryset = Candidate
     serializer_class = CandidateSerializer
