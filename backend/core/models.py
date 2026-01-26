@@ -13,7 +13,10 @@ class User(AbstractUser):
         TECH_LEAD = "tech_lead", "Техлид"
 
     role = models.CharField(
-        "Роль", max_length=15, choices=Roles.choices, default=Roles.ADMIN
+        "Роль",
+        max_length=15,
+        choices=Roles.choices,
+        default=Roles.ADMIN,
     )
 
     class Meta:
