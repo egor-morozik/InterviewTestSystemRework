@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link } from "react-router";
+import { BrowserRouter, Routes, Route, NavLink } from "react-router";
 import { Questions } from "./pages/Questions"
 import { Tests } from "./pages/Tests"
 import { Candidates } from "./pages/Candidates"
@@ -6,6 +6,13 @@ import { Attempts } from "./pages/Attempts"
 import { Results } from "./pages/Results"
 
 function App() {
+  const navLinkStyles = ({ isActive }) => 
+    `px-6 py-3 text-sm font-extrabold transition-colors ${
+      isActive 
+        ? "border-b-2 border-slate-500 text-slate-500" 
+        : "text-neutral-700 hover:bg-gray-100 border-b-2 border-transparent"
+    }`;
+
   return (
     <BrowserRouter>
       <div className="min-h-screen flex flex-col">
@@ -17,21 +24,21 @@ function App() {
         </header>
 
         <nav className="mx-5 mt-2 bg-white flex border border-neutral-100 shrink-0">
-          <Link to="/questions" className="px-6 py-3 border-b-2 border-slate-500 text-slate-500 text-sm font-extrabold">
+          <NavLink title="Questions" to="/questions" className={navLinkStyles}>
             Questions
-          </Link>
-          <Link to="/tests" className="px-6 py-3 text-neutral-700 text-sm hover:bg-gray-100">
+          </NavLink>
+          <NavLink title="Tests" to="/tests" className={navLinkStyles}>
             Tests
-          </Link>
-          <Link to="/candidates" className="px-6 py-3 text-neutral-700 text-sm hover:bg-gray-100">
+          </NavLink>
+          <NavLink title="Candidates" to="/candidates" className={navLinkStyles}>
             Candidates
-          </Link>
-          <Link to="/attempts" className="px-6 py-3 text-neutral-700 text-sm hover:bg-gray-100">
+          </NavLink>
+          <NavLink title="Attempts" to="/attempts" className={navLinkStyles}>
             Attempts
-          </Link>
-          <Link to="/results" className="px-6 py-3 text-neutral-700 text-sm hover:bg-gray-100">
+          </NavLink>
+          <NavLink title="Results" to="/results" className={navLinkStyles}>
             Results
-          </Link>          
+          </NavLink>          
         </nav>
 
         <main className="flex-1 mx-5 mt-4 bg-white rounded-t-lg shadow-inner overflow-auto">
