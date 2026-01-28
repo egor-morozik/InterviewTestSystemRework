@@ -491,42 +491,6 @@ export function Results() {
                   </button>
                 </div>
               </div>
-              
-              {/* Статистика */}
-              <div className="bg-white rounded-lg shadow-sm border border-neutral-100 overflow-hidden">
-                <header className="px-6 py-4 border-b border-zinc-200">
-                  <h2 className="text-neutral-700 text-xl font-extrabold font-['Inter'] text-center">
-                    Statistics
-                  </h2>
-                </header>
-                
-                <div className="p-4 md:p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {results.length}
-                      </div>
-                      <div className="text-sm text-gray-600">Total Results</div>
-                    </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">
-                        {results.filter(r => r.status === 'evaluated').length}
-                      </div>
-                      <div className="text-sm text-gray-600">Evaluated</div>
-                    </div>
-                  </div>
-                  
-                  <div className="text-center p-3 bg-purple-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {results.length > 0 
-                        ? Math.round(results.reduce((sum, r) => sum + (r.manualGrade || r.autoResult), 0) / results.length)
-                        : 0
-                      }%
-                    </div>
-                    <div className="text-sm text-gray-600">Average Score</div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
