@@ -6,6 +6,10 @@ class Candidate(models.Model):
     Модель кандидата на получение должности.
     """
 
+    class CandidateStatus(models.TextChoices):
+        TEST = "test", "тестирование"
+        INTERVIEW = "interview", "интервью"
+
     full_name = models.CharField(
         "ФИО",
         max_length=255,
@@ -16,9 +20,15 @@ class Candidate(models.Model):
         unique=True,
     )
 
-    vacancy = models.CharField(
+    position = models.CharField(
         "Претендуемая должность",
         max_length=100,
+    )
+
+    status = models.CharField(
+        "Статус кандидата",
+        choices=CandidateStatus.choices,
+        default=CandidateStatus.TEST,
     )
 
     class Meta:

@@ -43,6 +43,10 @@ class Attempt(models.Model):
         verbose_name="Шаблон теста",
     )
 
+    last_send = models.DateTimeField(
+        "Последняя отправка теста",
+    )
+
     class Meta:
         verbose_name = "Попытка"
         verbose_name_plural = "Попытки"

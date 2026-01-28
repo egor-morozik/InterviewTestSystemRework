@@ -49,6 +49,7 @@ class AttemptSerializer(serializers.ModelSerializer):
             "test_title",
             "tab_switches",
             "answers",
+            "last_send"
         ]
         read_only_fields = [
             "unique_link",

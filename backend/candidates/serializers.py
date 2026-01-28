@@ -10,5 +10,5 @@ class CandidateSerializer(serializers.ModelSerializer):
         fields = [
             "full_name",
             "email",
-            "vacancy",
+            "position",
         ]
