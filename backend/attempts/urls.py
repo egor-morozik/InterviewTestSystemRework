@@ -9,11 +9,6 @@ router.register(r"attempts", AttemptViewSet, basename="attempt")
 
 urlpatterns = [
     path(
-        "api/attempts/<uuid:unique_link>/log/", 
-        TabSwitchCreateView.as_view(),
-        name="attempt-log"
-    ),
-    path(
         "api/",
         include(router.urls),
     ),
