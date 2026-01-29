@@ -7,19 +7,29 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('questions', '0001_initial'),
-        ('tests', '0001_initial'),
+        ("questions", "0001_initial"),
+        ("tests", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='testquestion',
-            name='question',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='in_tests', to='questions.question', verbose_name='Вопрос'),
+            model_name="testquestion",
+            name="question",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="in_tests",
+                to="questions.question",
+                verbose_name="Вопрос",
+            ),
         ),
         migrations.AlterField(
-            model_name='testquestion',
-            name='test',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='test_questions', to='tests.test', verbose_name='Тест'),
+            model_name="testquestion",
+            name="test",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="test_questions",
+                to="tests.test",
+                verbose_name="Тест",
+            ),
         ),
     ]

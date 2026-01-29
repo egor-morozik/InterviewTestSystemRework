@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('candidates', '0002_rename_vacancy_candidate_position'),
+        ("candidates", "0002_rename_vacancy_candidate_position"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='candidate',
-            name='status',
-            field=models.CharField(choices=[('test', 'тестирование'), ('interview', 'интервью')], default='test', verbose_name='Статус кандидата'),
+            model_name="candidate",
+            name="status",
+            field=models.CharField(
+                choices=[("test", "тестирование"), ("interview", "интервью")],
+                default="test",
+                verbose_name="Статус кандидата",
+            ),
         ),
     ]

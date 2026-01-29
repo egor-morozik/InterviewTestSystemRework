@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from questions.serializers import QuestionSerializer
+
 from .models import Answer, Attempt, TabSwitchLog
 
 
@@ -49,8 +51,19 @@ class AttemptSerializer(serializers.ModelSerializer):
             "test_title",
             "tab_switches",
             "answers",
-            "last_send"
+            "last_send",
         ]
         read_only_fields = [
             "unique_link",
         ]
+
+
+class AttemptForCandidate(serializers.ModelSerializer):
+
+    test_title = serializers.CharField(source="test.title", read_only=True)
+
+    questions = QuestionSerializer(source="test.questions", many=True, read_only=True)
+
+    class Meta:
+        model = Attempt
+        fields = ["unique_link", "test_title", "questions", "completed"]

@@ -7,14 +7,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('attempts', '0001_initial'),
+        ("attempts", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='attempt',
-            name='last_send',
-            field=models.DateTimeField(default=django.utils.timezone.now, verbose_name='Последняя отправка теста'),
+            model_name="attempt",
+            name="last_send",
+            field=models.DateTimeField(
+                default=django.utils.timezone.now,
+                verbose_name="Последняя отправка теста",
+            ),
             preserve_default=False,
         ),
     ]
