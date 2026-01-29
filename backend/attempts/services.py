@@ -16,4 +16,4 @@ def submit_test_attempt(attempt, answers_data):
 
     attempt.completed = True
     attempt.save()
-    # Mark logic 
+    # Mark logic
