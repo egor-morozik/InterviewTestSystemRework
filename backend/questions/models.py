@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -94,10 +95,11 @@ class Choice(models.Model):
         related_name="choices",
         verbose_name="Вопрос",
     )
-    text = models.CharField(
+
+    text = models.TextField(
         "Содержимое варианта ответа",
-        max_length=255,
     )
+
     is_correct = models.BooleanField(
         "Правильность ответа",
         default=False,
@@ -106,3 +108,16 @@ class Choice(models.Model):
     class Meta:
         verbose_name = "Вариант ответа"
         verbose_name_plural = "Варианты ответов"
+
+    def clean(self):
+        if self.question.question_type == Question.QuestionType.SINGLE_CHOICE:
+            exists = (
+                Choice.objects.filter(question=self.question, is_correct=True)
+                .exclude(id=self.id)
+                .exists()
+            )
+
+            if self.is_correct and exists:
+                raise ValidationError(
+                    "У вопроса с одиночным выбором может быть только один правильный ответ."
+                )

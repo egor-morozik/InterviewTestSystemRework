@@ -36,8 +36,15 @@ class AttemptSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
-    test_title = serializers.CharField(source="test.title")
-    candidate_email = serializers.EmailField(source="candidate.email")
+    test_title = serializers.CharField(
+        source="test.title",
+        read_only=True,
+    )
+
+    candidate_email = serializers.EmailField(
+        source="candidate.email",
+        read_only=True,
+    )
 
     class Meta:
         model = Attempt
@@ -60,10 +67,22 @@ class AttemptSerializer(serializers.ModelSerializer):
 
 class AttemptForCandidate(serializers.ModelSerializer):
 
-    test_title = serializers.CharField(source="test.title", read_only=True)
+    test_title = serializers.CharField(
+        source="test.title",
+        read_only=True,
+    )
 
-    questions = QuestionSerializer(source="test.questions", many=True, read_only=True)
+    questions = QuestionSerializer(
+        source="test.questions",
+        many=True,
+        read_only=True,
+    )
 
     class Meta:
         model = Attempt
-        fields = ["unique_link", "test_title", "questions", "completed"]
+        fields = [
+            "unique_link",
+            "test_title",
+            "questions",
+            "completed",
+        ]

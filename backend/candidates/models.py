@@ -29,6 +29,7 @@ class Candidate(models.Model):
         "Статус кандидата",
         choices=CandidateStatus.choices,
         default=CandidateStatus.TEST,
+        max_length=15,
     )
 
     class Meta:

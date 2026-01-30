@@ -24,6 +24,12 @@ class Attempt(models.Model):
         default=False,
     )
 
+    last_send = models.DateTimeField(
+        "Последняя отправка теста",
+        null=True,
+        blank=True,
+    )
+
     completed = models.BooleanField(
         "Пройден",
         default=False,
@@ -43,10 +49,6 @@ class Attempt(models.Model):
         verbose_name="Шаблон теста",
     )
 
-    last_send = models.DateTimeField(
-        "Последняя отправка теста",
-    )
-
     class Meta:
         verbose_name = "Попытка"
         verbose_name_plural = "Попытки"
@@ -60,10 +62,14 @@ class TabSwitchLog(models.Model):
     Уходы кандидата со страницы теста во время его выполнения.
     """
 
+    class EVENTS_TYPES(models.TextChoices):
+        HIDDEN = "hidden", "ушёл"
+        VISIBLE = "visible", "вернулся"
+
     event_type = models.CharField(
         "Тип события",
         max_length=10,
-        choices=(("hidden", "Ушёл"), ("visible", "Вернулся")),
+        choices=EVENTS_TYPES.choices,
     )
 
     attempt = models.ForeignKey(
@@ -79,7 +85,6 @@ class TabSwitchLog(models.Model):
     )
 
     class Meta:
-        ordering = ["timestamp"]
         verbose_name = "Лог ухода/возврата"
         verbose_name_plural = "Логи уходов/возвратов"
 

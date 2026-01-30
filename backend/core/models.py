@@ -25,3 +25,15 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.role} - {self.username}"
+
+    @property
+    def is_admin(self):
+        return self.role == self.Roles.ADMIN
+
+    @property
+    def is_hr(self):
+        return self.role == self.Roles.HR
+
+    @property
+    def is_tech_lead(self):
+        return self.role == self.Roles.ADMIN

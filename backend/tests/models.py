@@ -4,7 +4,7 @@ from questions.models import Question
 
 
 class Test(models.Model):
-    "Модель теста состоящего из различных вопросов."
+    """Модель теста состоящего из различных вопросов."""
 
     title = models.CharField(
         "Название теста",
