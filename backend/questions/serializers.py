@@ -24,9 +24,14 @@ class ChoiceSerializer(serializers.ModelSerializer):
 
 class QuestionSerializer(serializers.ModelSerializer):
 
-    choices = ChoiceSerializer(many=True)
+    choices = ChoiceSerializer(
+        many=True
+    )
+    
     tags = serializers.SlugRelatedField(
-        many=True, slug_field="title", queryset=Tag.objects.all()
+        many=True, 
+        slug_field="title", 
+        queryset=Tag.objects.all(),
     )
 
     class Meta:
