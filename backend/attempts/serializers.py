@@ -24,7 +24,7 @@ class AnswerSerializer(serializers.ModelSerializer):
         ]
 
 
-class AttemptSerializer(serializers.ModelSerializer):
+class AdminAttemptSerializer(serializers.ModelSerializer):
 
     tab_switches = TabSwitchLogSerializer(
         many=True,
@@ -65,12 +65,7 @@ class AttemptSerializer(serializers.ModelSerializer):
         ]
 
 
-class AttemptForCandidate(serializers.ModelSerializer):
-
-    test_title = serializers.CharField(
-        source="test.title",
-        read_only=True,
-    )
+class CandidateAttemptSerializer(serializers.ModelSerializer):
 
     questions = QuestionSerializer(
         source="test.questions",
@@ -78,11 +73,16 @@ class AttemptForCandidate(serializers.ModelSerializer):
         read_only=True,
     )
 
+    time_limit = serializers.IntegerField(
+        source="test.time_limit",
+        read_only=True,
+    )
+
     class Meta:
         model = Attempt
         fields = [
             "unique_link",
-            "test_title",
             "questions",
+            "time_limit",
             "completed",
         ]
