@@ -57,3 +57,22 @@ class TestSerializer(serializers.ModelSerializer):
         TestQuestion.objects.bulk_create(
             [TestQuestion(test=test, **item) for item in questions_data],
         )
+
+    def update(self, instance, validated_data):
+        questions_data = validated_data.pop("test_questions", None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if questions_data is not None:
+            keep_questions_ids = [item["question"].id for item in questions_data]
+            instance.test_questions.exclude(question_id__in=keep_questions_ids).delete()
+            for item in questions_data:
+                TestQuestion.objects.update_or_create(
+                    test=instance,
+                    question=item["question"],
+                    defaults={"order": item["order"]},
+                )
+
+        return instance
