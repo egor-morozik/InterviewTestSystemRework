@@ -58,7 +58,7 @@ class QuestionSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         instance = Question(
-            **{k: v for k, v in data.items() if k != "choices" and k != "tags"}
+            **{k: v for k, v in data.items() if k != "choices" and k != "tags"},
         )
         try:
             instance.full_clean()
@@ -74,14 +74,14 @@ class QuestionSerializer(serializers.ModelSerializer):
             if correct_count != 1:
                 raise serializers.ValidationError(
                     {
-                        "choices": "Для этого типа вопроса должен быть ровно ОДИН правильный ответ."
-                    }
+                        "choices": "Для этого типа вопроса должен быть ровно ОДИН правильный ответ.",
+                    },
                 )
 
         elif question_type == Question.QuestionType.MULTIPLE_CHOICE:
             if correct_count < 1:
                 raise serializers.ValidationError(
-                    {"choices": "Выберите хотя бы один правильный ответ."}
+                    {"choices": "Выберите хотя бы один правильный ответ."},
                 )
 
         return data
