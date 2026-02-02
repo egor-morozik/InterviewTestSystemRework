@@ -1,4 +1,3 @@
-from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -52,9 +51,32 @@ class Question(models.Model):
     tags = models.ManyToManyField(
         "Tag",
         verbose_name="Теги",
-        related_name="questions",
+        related_name="in_questions",
         blank=True,
     )
+
+    expected_answer = models.TextField(
+        "Ответ",
+        blank=True,
+        null=True,
+    )
+
+    is_manual_verification_only = models.BooleanField(
+        "Только ручная оценка",
+        default=False,
+    )
+
+    @property
+    def get_expected_answer(self):
+        all_choices = self.choices.all()
+        match self.question_type:
+            case self.QuestionType.SINGLE_CHOICE:
+                choice = next((c for c in all_choices if c.is_correct), None)
+                return choice.id if choice else None
+            case self.QuestionType.MULTIPLE_CHOICE:
+                return sorted([c.id for c in all_choices if c.is_correct])
+            case _:
+                return self.expected_answer
 
     class Meta:
         verbose_name = "Вопрос"
@@ -86,7 +108,7 @@ class Tag(models.Model):
 
 class Choice(models.Model):
     """
-    Модель для специальных вариантов ответов на вопрос типа выбор ответа (-ов)
+    Модель для специальных вариантов ответов на вопрос типа выбор ответа/ов.
     """
 
     question = models.ForeignKey(
@@ -108,16 +130,8 @@ class Choice(models.Model):
     class Meta:
         verbose_name = "Вариант ответа"
         verbose_name_plural = "Варианты ответов"
-
-    def clean(self):
-        if self.question.question_type == Question.QuestionType.SINGLE_CHOICE:
-            exists = (
-                Choice.objects.filter(question=self.question, is_correct=True)
-                .exclude(id=self.id)
-                .exists()
-            )
-
-            if self.is_correct and exists:
-                raise ValidationError(
-                    "У вопроса с одиночным выбором может быть только один правильный ответ."
-                )
+        indexes = [
+            models.Index(
+                fields=["question", "is_correct"],
+            ),
+        ]
