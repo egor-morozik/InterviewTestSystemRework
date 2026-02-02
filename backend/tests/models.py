@@ -4,7 +4,9 @@ from questions.models import Question
 
 
 class Test(models.Model):
-    """Модель теста состоящего из различных вопросов."""
+    """
+    Модель теста состоящего из различных вопросов.
+    """
 
     title = models.CharField(
         "Название теста",
@@ -14,12 +16,13 @@ class Test(models.Model):
 
     description = models.TextField(
         "Описание теста",
+        blank=True,
     )
 
     time_limit = models.PositiveSmallIntegerField(
         "Ограничение по времени",
         default=0,
-        help_text="В минутах. Для бесконечности - 0",
+        help_text="В минутах. 0 - неограничен",
     )
 
     questions = models.ManyToManyField(
@@ -38,7 +41,9 @@ class Test(models.Model):
 
 
 class TestQuestion(models.Model):
-    "Модель для связывания вопросов внутри тестов."
+    """
+    Модель для связывания вопросов внутри тестов.
+    """
 
     test = models.ForeignKey(
         Test,
@@ -58,18 +63,25 @@ class TestQuestion(models.Model):
         "Порядок вопроса в тесте",
         default=0,
         help_text="Чем меньше - тем раньше",
+        db_index=True,
     )
 
     class Meta:
         ordering = [
             "order",
         ]
-        unique_together = (
-            "test",
-            "question",
-        )
+        constraints = [
+            models.UniqueConstraint(
+                fields=["test", "question"],
+                name="unique_test_question",
+            ),
+            models.UniqueConstraint(
+                fields=["test", "order"],
+                name="unique_order_per_test",
+            ),
+        ]
         verbose_name = "Вопрос в шаблоне"
         verbose_name_plural = "Вопросы в шаблоне"
 
     def __str__(self):
-        return f"{self.test} - {self.question} (порядок {self.order})"
+        return f"тест : {self.test.title} - номер : {self.order} - вопрос : {self.question.title}"

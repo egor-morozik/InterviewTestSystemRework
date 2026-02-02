@@ -5,5 +5,9 @@ from .serializers import TestSerializer
 
 
 class TestViewSet(viewsets.ModelViewSet):
-    queryset = Test
+    """
+    Представление для работы с тестами.
+    """
+
+    queryset = Test.objects.prefetch_related("test_questions__question").all()
     serializer_class = TestSerializer
