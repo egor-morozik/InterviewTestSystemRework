@@ -23,6 +23,10 @@ dependencies = [
     { name = "djangorestframework" },
     { name = "redis" },
     { name = "requests" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "ruff" },
 ]
 
@@ -35,8 +39,10 @@ requires-dist = [
     { name = "djangorestframework", specifier = "==3.16.1" },
     { name = "redis", specifier = "==7.1.0" },
     { name = "requests", specifier = "==2.32.5" },
-    { name = "ruff", specifier = "==0.14.14" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ruff", specifier = "==0.14.14" }]
 
 [[package]]
 name = "certifi"
