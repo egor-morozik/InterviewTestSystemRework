@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'backend/**'
+      - '.github/workflows/backend_lint.yml'
 
 jobs:
   lint:
