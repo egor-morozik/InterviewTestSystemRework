@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -82,6 +83,25 @@ class Question(models.Model):
         verbose_name = "Вопрос"
         verbose_name_plural = "Вопросы"
         ordering = ["-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(is_manual_verification_only=True)
+                    | ~models.Q(question_type="text", expected_answer__isnull=True)
+                ),
+                name="text_question_integrity",
+            )
+        ]
+
+    def clean(self):
+        if (
+            self.question_type == self.QuestionType.TEXT
+            and not self.is_manual_verification_only
+            and not self.expected_answer
+        ):
+            raise ValidationError(
+                "Укажите правильный ответ или выставите ручную оценку."
+            )
 
     def __str__(self):
         return f"{self.title}"
@@ -133,5 +153,11 @@ class Choice(models.Model):
         indexes = [
             models.Index(
                 fields=["question", "is_correct"],
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["question", "text"],
+                name="unique_answer_text_per_question",
             ),
         ]
