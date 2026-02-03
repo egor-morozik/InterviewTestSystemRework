@@ -25,7 +25,6 @@ class AnswerSerializer(serializers.ModelSerializer):
 
 
 class AdminAttemptSerializer(serializers.ModelSerializer):
-
     tab_switches = TabSwitchLogSerializer(
         many=True,
         read_only=True,
@@ -66,7 +65,6 @@ class AdminAttemptSerializer(serializers.ModelSerializer):
 
 
 class CandidateAttemptSerializer(serializers.ModelSerializer):
-
     questions = QuestionSerializer(
         source="test.questions",
         many=True,

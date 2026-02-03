@@ -4,6 +4,5 @@ from .models import Interview
 
 
 class InterviewSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Interview

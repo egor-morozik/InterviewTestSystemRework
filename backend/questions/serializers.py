@@ -71,9 +71,7 @@ class QuestionSerializer(serializers.ModelSerializer):
         question = Question.objects.create(**validated_data)
         question.tags.set(tags_data)
 
-        Choice.objects.bulk_create(
-            [Choice(question=question, **choice) for choice in choices_data]
-        )
+        Choice.objects.bulk_create([Choice(question=question, **choice) for choice in choices_data])
 
         return question
 
@@ -83,15 +81,9 @@ class QuestionSerializer(serializers.ModelSerializer):
         correct_count = sum(1 for c in choices if c.get("is_correct"))
 
         if question_type == Question.QuestionType.SINGLE_CHOICE and correct_count != 1:
-            raise serializers.ValidationError(
-                {"choices": "Должен быть ровно один правильный ответ."}
-            )
+            raise serializers.ValidationError({"choices": "Должен быть ровно один правильный ответ."})
 
-        elif (
-            question_type == Question.QuestionType.MULTIPLE_CHOICE and correct_count < 1
-        ):
-            raise serializers.ValidationError(
-                {"choices": "Выберите хотя бы один правильный ответ."}
-            )
+        elif question_type == Question.QuestionType.MULTIPLE_CHOICE and correct_count < 1:
+            raise serializers.ValidationError({"choices": "Выберите хотя бы один правильный ответ."})
 
         return data

@@ -99,9 +99,7 @@ class Question(models.Model):
             and not self.is_manual_verification_only
             and not self.expected_answer
         ):
-            raise ValidationError(
-                "Укажите правильный ответ или выставите ручную оценку."
-            )
+            raise ValidationError("Укажите правильный ответ или выставите ручную оценку.")
 
     def __str__(self):
         return f"{self.title}"

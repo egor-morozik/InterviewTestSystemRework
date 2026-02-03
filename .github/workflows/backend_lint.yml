@@ -21,14 +21,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install tools
-        run: pip install black isort flake8
+      - name: Install Ruff
+        run: pip install ruff
 
-      - name: Run Isort
-        run: isort . --check-only --profile black --skip migrations
+      - name: Run Ruff Check
+        run: ruff check . --output-format=github
 
-      - name: Run Black
-        run: black . --check --line-length 120 --exclude migrations
-
-      - name: Run Flake8
-        run: flake8 .
+      - name: Run Ruff Format
+        run: ruff format . --check
