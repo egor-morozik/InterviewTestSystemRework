@@ -1,4 +1,4 @@
-name: CI
+name: Backend CI
 
 on:
   push:
@@ -7,7 +7,8 @@ on:
       - '.github/workflows/backend_lint.yml'
 
 jobs:
-  lint:
+  check:
+    name: Lint
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -17,16 +18,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.11'
+          enable-cache: true
+          python-version: '3.14'
 
-      - name: Install Ruff
-        run: pip install ruff
+      - name: Check lockfile sync
+        run: uv lock --check
+
+      - name: Install dependencies
+        run: uv sync --frozen
 
       - name: Run Ruff Check
-        run: ruff check . --output-format=github
+        run: uv run ruff check . --output-format=github
 
       - name: Run Ruff Format
-        run: ruff format . --check
+        run: uv run ruff format . --check
