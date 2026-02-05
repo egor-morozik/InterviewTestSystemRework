@@ -7,6 +7,10 @@ from .serializers import CandidateSerializer
 
 
 class CandidateViewSet(viewsets.ModelViewSet):
+    """
+    Представление данных кандидата в системе.
+    """
+
     queryset = Candidate
     serializer_class = CandidateSerializer
 

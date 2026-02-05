@@ -4,26 +4,49 @@ from rest_framework.response import Response
 
 from .models import Attempt
 from .serializers import (
+    ActivityLogSerializer,
     AdminAttemptSerializer,
+    AnswerSerializer,
     CandidateAttemptSerializer,
-    TabSwitchLogSerializer,
 )
 
 
 class AdminAttemptViewSet(viewsets.ModelViewSet):
-    queryset = Attempt.objects.all()
+    """
+    Представление для предоставления всех попыток пройти тест и инфо. о попытках.
+    """
+
+    queryset = (
+        Attempt.objects.select_related("candidate", "test")
+        .prefetch_related(
+            "tab_switches",
+            "answers__question",
+        )
+        .all()
+    )
     serializer_class = AdminAttemptSerializer
 
 
 class CandidateAttemptViewSet(viewsets.GenericViewSet):
-    queryset = Attempt.objects.all()
+    """
+    Представления для отдачи данных для прохождения теста кандидату.
+    """
+
+    queryset = (
+        Attempt.objects.all()
+        .select_related("candidate", "test")
+        .prefetch_related(
+            "activity",
+            "answers__question",
+        )
+        .all()
+    )
     serializer_class = CandidateAttemptSerializer
-    lookup_field = "unique_link"
 
     @action(detail=True, methods=["post"], url_path="log")
     def log_switch(self, request, unique_link):
         attempt = self.get_object()
-        serializer = TabSwitchLogSerializer(data=request.data)
+        serializer = ActivityLogSerializer(data=request.data)
         serializer.save(attempt=attempt)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -43,9 +66,15 @@ class CandidateAttemptViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # save answers
-        # start celery task to evaluate answers
+        answers_data = request.data.get("answers", [])
+
+        answer_serializer = AnswerSerializer(data=answers_data, many=True)
+        answer_serializer.save(attempt=attempt)
 
         attempt.completed = True
         attempt.save()
+
+        # start celery task to evaluate answers
+        # calculate_attempt_score_task.delay(attempt.id)
+
         return Response({"status": "Тест успешно завершен"})

@@ -2,12 +2,16 @@ from rest_framework import serializers
 
 from questions.serializers import QuestionSerializer
 
-from .models import Answer, Attempt, TabSwitchLog
+from .models import ActivityLog, Answer, Attempt
 
 
-class TabSwitchLogSerializer(serializers.ModelSerializer):
+class ActivityLogSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор данных о подозрительной активности во время прохождения теста.
+    """
+
     class Meta:
-        model = TabSwitchLog
+        model = ActivityLog
         fields = [
             "event_type",
             "timestamp",
@@ -15,17 +19,28 @@ class TabSwitchLogSerializer(serializers.ModelSerializer):
 
 
 class AnswerSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор данных ответа кандидата.
+    """
+
+    question_text = serializers.CharField(source="question.text", read_only=True)
+
     class Meta:
         model = Answer
         fields = [
             "question",
+            "question_text",
             "response",
             "score",
         ]
 
 
 class AdminAttemptSerializer(serializers.ModelSerializer):
-    tab_switches = TabSwitchLogSerializer(
+    """
+    Сериализатор данных о попытках прохождения тестов кандидатами.
+    """
+
+    activity = ActivityLogSerializer(
         many=True,
         read_only=True,
     )
@@ -37,6 +52,11 @@ class AdminAttemptSerializer(serializers.ModelSerializer):
 
     test_title = serializers.CharField(
         source="test.title",
+        read_only=True,
+    )
+
+    candidate_name = serializers.CharField(
+        source="candidate.full_name",
         read_only=True,
     )
 
@@ -52,10 +72,11 @@ class AdminAttemptSerializer(serializers.ModelSerializer):
             "sent",
             "completed",
             "candidate",
+            "candidate_name",
             "candidate_email",
             "test",
             "test_title",
-            "tab_switches",
+            "activity",
             "answers",
             "last_send",
         ]
@@ -65,6 +86,10 @@ class AdminAttemptSerializer(serializers.ModelSerializer):
 
 
 class CandidateAttemptSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор данных о тесте для предоставления кандидату.
+    """
+
     questions = QuestionSerializer(
         source="test.questions",
         many=True,
@@ -84,3 +109,10 @@ class CandidateAttemptSerializer(serializers.ModelSerializer):
             "time_limit",
             "completed",
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.completed:
+            data["questions"] = []
+            data["message"] = "Тест уже завершен."
+        return data

@@ -5,6 +5,10 @@ from .models import Candidate
 
 
 class CandidateSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор данных кандидата в системе.
+    """
+
     class Meta:
         model = Candidate
         fields = [

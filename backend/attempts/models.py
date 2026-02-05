@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from django.utils import timezone
 
 from candidates.models import Candidate
 from questions.models import Question
@@ -12,11 +13,10 @@ class Attempt(models.Model):
     Модель состояния теста кандидата.
     """
 
-    unique_link = models.UUIDField(
-        "Уникальная ссылка на тест",
+    id = models.UUIDField(
+        primary_key=True,
         default=uuid.uuid4,
         editable=False,
-        unique=True,
     )
 
     sent = models.BooleanField(
@@ -33,6 +33,12 @@ class Attempt(models.Model):
     completed = models.BooleanField(
         "Пройден",
         default=False,
+    )
+
+    completed_at = models.DateTimeField(
+        "Время завершения",
+        null=True,
+        blank=True,
     )
 
     candidate = models.ForeignKey(
@@ -56,37 +62,45 @@ class Attempt(models.Model):
     def __str__(self):
         return f"Приглашение для {self.candidate.email} - {self.test.title}"
 
+    def mark_as_completed(self):
+        self.completed = True
+        self.completed_at = timezone.now()
+        self.save()
 
-class TabSwitchLog(models.Model):
+
+class ActivityLog(models.Model):
     """
-    Уходы кандидата со страницы теста во время его выполнения.
+    Записи о подозрительной активности кандидата.
     """
 
     class EVENTS_TYPES(models.TextChoices):
         HIDDEN = "hidden", "ушёл"
         VISIBLE = "visible", "вернулся"
+        COPYTEXT = "copytext", "скопировал текст"
+        SCREENSHOT = "screenshot", "сделал скриншот"
 
     event_type = models.CharField(
         "Тип события",
-        max_length=10,
+        max_length=15,
         choices=EVENTS_TYPES.choices,
     )
 
     attempt = models.ForeignKey(
         Attempt,
         on_delete=models.CASCADE,
-        related_name="tab_switches",
+        related_name="activity",
         verbose_name="Приглашение",
     )
 
     timestamp = models.DateTimeField(
         "Время события",
         auto_now_add=True,
+        db_index=True,
     )
 
     class Meta:
-        verbose_name = "Лог ухода/возврата"
-        verbose_name_plural = "Логи уходов/возвратов"
+        verbose_name = "Лог подозрительных действий"
+        verbose_name_plural = "Логи подозрительных действий"
 
     def __str__(self):
         return f"{self.attempt} - {self.get_event_type_display()} ({self.timestamp})"
@@ -123,7 +137,4 @@ class Answer(models.Model):
     class Meta:
         verbose_name = "Ответ"
         verbose_name_plural = "Ответы"
-        unique_together = (
-            "attempt",
-            "question",
-        )
+        constraints = [models.UniqueConstraint(fields=["attempt", "question"], name="unique_answer_per_attempt")]
