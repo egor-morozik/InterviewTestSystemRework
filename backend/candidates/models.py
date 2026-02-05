@@ -13,6 +13,7 @@ class Candidate(models.Model):
     full_name = models.CharField(
         "ФИО",
         max_length=255,
+        db_index=True,
     )
 
     email = models.EmailField(
@@ -23,6 +24,7 @@ class Candidate(models.Model):
     position = models.CharField(
         "Претендуемая должность",
         max_length=100,
+        db_index=True,
     )
 
     status = models.CharField(
@@ -35,6 +37,15 @@ class Candidate(models.Model):
     class Meta:
         verbose_name = "Кандидат"
         verbose_name_plural = "Кандидаты"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "email",
+                    "position",
+                ],
+                name="unique_candidate_per_position",
+            ),
+        ]
 
     def __str__(self):
         return self.full_name
