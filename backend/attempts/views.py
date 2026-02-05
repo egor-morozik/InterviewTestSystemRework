@@ -2,6 +2,8 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from evaluations.tasks import evaluate_answer
+
 from .models import Attempt
 from .serializers import (
     ActivityLogSerializer,
@@ -74,7 +76,6 @@ class CandidateAttemptViewSet(viewsets.GenericViewSet):
         attempt.completed = True
         attempt.save()
 
-        # start celery task to evaluate answers
-        # calculate_attempt_score_task.delay(attempt.id)
+        evaluate_answer.delay(attempt.id)
 
         return Response({"status": "Тест успешно завершен"})

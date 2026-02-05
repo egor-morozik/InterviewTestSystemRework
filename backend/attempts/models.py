@@ -41,6 +41,12 @@ class Attempt(models.Model):
         blank=True,
     )
 
+    total_score = models.PositiveSmallIntegerField(
+        "Общий балл",
+        null=True,
+        black=True,
+    )
+
     candidate = models.ForeignKey(
         Candidate,
         on_delete=models.CASCADE,
@@ -117,7 +123,8 @@ class Answer(models.Model):
 
     score = models.PositiveSmallIntegerField(
         "Баллы (автооценка)",
-        default=0,
+        null=True,
+        blank=True,
     )
 
     attempt = models.ForeignKey(
