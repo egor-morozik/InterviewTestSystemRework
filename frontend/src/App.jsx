@@ -1,28 +1,31 @@
-import { BrowserRouter, Routes, Route, NavLink } from "react-router";
-import { Questions } from "./pages/Questions"
-import { Tests } from "./pages/Tests"
-import { Candidates } from "./pages/Candidates"
-import { Attempts } from "./pages/Attempts"
-import { Results } from "./pages/Results"
-import { CandidateTest } from "./pages/CandidateTest"
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router'
+import { Questions } from './pages/Questions'
+import { Tests } from './pages/Tests'
+import { Candidates } from './pages/Candidates'
+import { Attempts } from './pages/Attempts'
+import { Results } from './pages/Results'
+import { CandidateTest } from './pages/CandidateTest'
 
 function App() {
-  const navLinkStyles = ({ isActive }) => 
+  const navLinkStyles = ({ isActive }) =>
     `px-6 py-3 text-sm font-extrabold transition-colors ${
-      isActive 
-        ? "border-b-2 border-slate-500 text-slate-500" 
-        : "text-neutral-700 hover:bg-gray-100 border-b-2 border-transparent"
-    }`;
+      isActive
+        ? 'border-b-2 border-slate-500 text-slate-500'
+        : 'text-neutral-700 hover:bg-gray-100 border-b-2 border-transparent'
+    }`
 
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/candidate_test" element={<CandidateTestLayout />} />
 
-        <Route path="*" element={<AdminLayout navLinkStyles={navLinkStyles} />} />
+        <Route
+          path="*"
+          element={<AdminLayout navLinkStyles={navLinkStyles} />}
+        />
       </Routes>
     </BrowserRouter>
-  );
+  )
 }
 
 function AdminLayout({ navLinkStyles }) {
@@ -49,12 +52,12 @@ function AdminLayout({ navLinkStyles }) {
         </NavLink>
         <NavLink title="Results" to="/results" className={navLinkStyles}>
           Results
-        </NavLink>          
+        </NavLink>
       </nav>
 
       <main className="flex-1 mx-5 mt-4 bg-white rounded-t-lg shadow-inner overflow-auto">
         <Routes>
-          <Route path="/" element={<Questions />} /> 
+          <Route path="/" element={<Questions />} />
           <Route path="/questions" element={<Questions />} />
           <Route path="/tests" element={<Tests />} />
           <Route path="/candidates" element={<Candidates />} />
@@ -63,7 +66,7 @@ function AdminLayout({ navLinkStyles }) {
         </Routes>
       </main>
     </div>
-  );
+  )
 }
 
 function CandidateTestLayout() {
@@ -71,7 +74,7 @@ function CandidateTestLayout() {
     <div className="min-h-screen bg-gray-50">
       <CandidateTest />
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
