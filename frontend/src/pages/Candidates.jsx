@@ -1,501 +1,568 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { candidateService } from '../api/implementations/candidateApi'
-import { testsService } from '../api/implementations/testsApi'
 
-export function CandidateTest() {
-  const { testId } = useParams() // Получаем ID теста из URL
-  const navigate = useNavigate()
-
-  const [timeLeft, setTimeLeft] = useState(0)
-  const [isTimerRunning, setIsTimerRunning] = useState(true)
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [answers, setAnswers] = useState({})
-  const [testCompleted, setTestCompleted] = useState(false)
+export function Candidates() {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [candidates, setCandidates] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Данные теста и вопросов
-  const [testData, setTestData] = useState(null)
-  const [questions, setQuestions] = useState([])
+  const [filters, setFilters] = useState({
+    status: '',
+    position: '',
+  })
 
-  // Загрузка теста и вопросов
+  const [newCandidate, setNewCandidate] = useState({
+    full_name: '',
+    email: '',
+    position: '',
+    status: 'pending',
+    notes: '',
+  })
+
+  // Загрузка кандидатов
   useEffect(() => {
-    const fetchTestData = async () => {
-      if (!testId) {
-        setError('Test ID is required')
-        setLoading(false)
-        return
-      }
-
+    const fetchCandidates = async () => {
       try {
         setLoading(true)
         setError(null)
 
-        // Загружаем данные теста
-        const testResponse = await testsService.getTest(testId)
-        setTestData(testResponse)
+        // Собираем параметры для API
+        const params = {}
 
-        // Извлекаем вопросы из теста
-        const testQuestions = testResponse.test_questions || []
-        const formattedQuestions = testQuestions.map((tq, index) => {
-          const question = tq.question
-          return {
-            id: question.id,
-            type: question.question_type,
-            category:
-              question.question_type === 'hr'
-                ? 'HR Questions'
-                : 'Tech Questions',
-            question: question.title || question.text || '',
-            questionType:
-              question.question_type === 'multiple'
-                ? 'multiple'
-                : question.question_type === 'single'
-                  ? 'single'
-                  : 'text',
-            maxLength: 1000,
-            options: question.choices?.map((choice) => choice.text) || [],
-            order: index + 1, // <-- используем index
-          }
-        })
+        if (searchQuery) {
+          params.search = searchQuery
+        }
 
-        setQuestions(formattedQuestions)
+        if (filters.status) {
+          params.status = filters.status
+        }
 
-        // Устанавливаем таймер на основе time_limit теста
-        const timeLimit = testResponse.time_limit || 300 // 5 минут по умолчанию
-        setTimeLeft(timeLimit * 60) // конвертируем минуты в секунды
+        if (filters.position) {
+          params.position = filters.position
+        }
+
+        const response = await candidateService.getAllCandidates(params)
+        setCandidates(response || [])
       } catch (err) {
-        setError('Failed to load test')
-        console.error('Error fetching test:', err)
+        setError('Failed to load candidates')
+        console.error('Error fetching candidates:', err)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchTestData()
-  }, [testId])
+    fetchCandidates()
+  }, [searchQuery, filters.status, filters.position])
 
-  // Таймер
-  useEffect(() => {
-    if (!isTimerRunning || testCompleted || loading) return
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          handleTestSubmit()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [isTimerRunning, testCompleted, loading, handleTestSubmit])
-
-  const formatTime = (seconds) => {
-    const minutes = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  const handleSearchSubmit = (e) => {
+    e.preventDefault()
+    // Поиск уже происходит при изменении searchQuery в useEffect
   }
 
-  const handleAnswerChange = (questionId, answer) => {
-    setAnswers((prev) => ({
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target
+    setFilters((prev) => ({
       ...prev,
-      [questionId]: answer,
+      [name]: value,
     }))
   }
 
-  const handleSingleSelect = (questionId, optionIndex) => {
-    setAnswers((prev) => ({
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setNewCandidate((prev) => ({
       ...prev,
-      [questionId]: optionIndex,
+      [name]: value,
     }))
   }
 
-  const handleMultipleSelect = (questionId, optionIndex) => {
-    const currentAnswers = answers[questionId] || []
-    const isSelected = currentAnswers.includes(optionIndex)
-
-    const newAnswers = isSelected
-      ? currentAnswers.filter((idx) => idx !== optionIndex)
-      : [...currentAnswers, optionIndex]
-
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: newAnswers.sort((a, b) => a - b),
-    }))
+  const handleImportCandidates = () => {
+    // TODO: Реализовать импорт кандидатов
+    alert('Import functionality will be implemented soon')
   }
 
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1)
-    }
-  }
-
-  const handlePrevQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex((prev) => prev - 1)
-    }
-  }
-
-  const handleQuestionSelect = (index) => {
-    setCurrentQuestionIndex(index)
-  }
-
-  const handleTestSubmit = useCallback(async () => {
-    if (testCompleted) return
+  const handleAddCandidate = async (e) => {
+    e.preventDefault()
 
     try {
-      setIsTimerRunning(false)
-      setTestCompleted(true)
+      setError(null)
 
-      // Форматируем ответы для отправки
-      const formattedAnswers = Object.entries(answers).map(
-        ([questionId, answer]) => {
-          const question = questions.find((q) => q.id === parseInt(questionId))
-
-          let answerValue = answer
-
-          // Для множественного выбора конвертируем индексы в текст
-          if (question?.questionType === 'multiple' && Array.isArray(answer)) {
-            answerValue = answer.map((idx) => question.options[idx]).join('; ')
-          }
-          // Для одиночного выбора конвертируем индекс в текст
-          else if (
-            question?.questionType === 'single' &&
-            typeof answer === 'number'
-          ) {
-            answerValue = question.options[answer]
-          }
-
-          return {
-            question: parseInt(questionId),
-            answer: answerValue,
-          }
-        }
-      )
-
-      // Данные кандидата (в реальном приложении нужно получать из формы входа)
-      const candidateData = {
-        test: testId,
-        full_name: 'Кандидат', // Заменить на реальные данные
-        email: 'candidate@example.com', // Заменить на реальные данные
-        answers: formattedAnswers,
-        time_spent: testData?.time_limit * 60 - timeLeft, // потраченное время в секундах
-        status: 'completed',
+      // Валидация email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(newCandidate.email)) {
+        alert('Please enter a valid email address')
+        return
       }
 
-      // Отправляем результаты теста
-      await candidateService.createCandidate(candidateData)
+      // Создаем кандидата через API
+      const response = await candidateService.createCandidate(newCandidate)
 
-      console.log('Test submitted:', answers)
+      // Добавляем нового кандидата в список
+      setCandidates([...candidates, response])
+
+      // Очищаем форму
+      setNewCandidate({
+        full_name: '',
+        email: '',
+        position: '',
+        status: 'pending',
+        notes: '',
+      })
+
+      console.log('Added candidate:', response)
     } catch (err) {
-      setError('Failed to submit test')
-      console.error('Error submitting test:', err)
-      // Показываем ошибку, но оставляем тест завершенным
-      alert(
-        'Произошла ошибка при отправке результатов. Пожалуйста, свяжитесь с администратором.'
-      )
+      setError('Failed to add candidate')
+      console.error('Error adding candidate:', err)
+      alert('Failed to add candidate. Please try again.')
     }
-  }, [answers, testCompleted, questions, testId, testData, timeLeft])
+  }
 
-  // Показываем загрузку
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">
-            Загрузка теста...
-          </h2>
-          <p className="text-gray-600">Пожалуйста, подождите</p>
-        </div>
-      </div>
+  const handleDeleteCandidate = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this candidate?')) {
+      return
+    }
+
+    try {
+      setError(null)
+      await candidateService.deleteCandidate(id)
+      setCandidates(candidates.filter((candidate) => candidate.id !== id))
+    } catch (err) {
+      setError('Failed to delete candidate')
+      console.error('Error deleting candidate:', err)
+    }
+  }
+
+  const handleEditCandidate = (candidate) => {
+    // TODO: Реализовать редактирование кандидата
+    console.log('Editing candidate:', candidate)
+    alert('Edit functionality will be implemented soon')
+  }
+
+  const handleViewDetails = (candidate) => {
+    const details = `
+Candidate Details:
+Name: ${candidate.full_name}
+Email: ${candidate.email}
+Position: ${candidate.position}
+Status: ${candidate.status}
+Created: ${new Date(candidate.created_at).toLocaleDateString()}
+Notes: ${candidate.notes || 'No notes'}
+    `
+    alert(details)
+  }
+
+  const handleSendTest = (candidate) => {
+    // TODO: Реализовать отправку теста
+    console.log('Sending test to:', candidate)
+    alert(
+      `Send test functionality will be implemented soon for ${candidate.full_name}`
     )
   }
 
-  // Показываем ошибку
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
-          <div className="text-red-500 text-5xl mb-4">✗</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Ошибка</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => navigate('/')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Вернуться на главную
-          </button>
-        </div>
-      </div>
-    )
+  const handleClearForm = () => {
+    setNewCandidate({
+      full_name: '',
+      email: '',
+      position: '',
+      status: 'pending',
+      notes: '',
+    })
   }
 
-  // Проверяем, есть ли вопросы
-  if (questions.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
-          <div className="text-yellow-500 text-5xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">
-            Тест не найден
-          </h2>
-          <p className="text-gray-600 mb-4">В этом тесте нет вопросов</p>
-          <button
-            onClick={() => navigate('/')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Вернуться на главную
-          </button>
-        </div>
-      </div>
-    )
+  // Функция для получения цвета статуса
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800'
+      case 'completed':
+        return 'bg-blue-100 text-blue-800'
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
   }
 
-  const currentQuestion = questions[currentQuestionIndex]
-  const progress = ((currentQuestionIndex + 1) / questions.length) * 100
+  // Функция для получения текста статуса
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'active':
+        return 'Active'
+      case 'completed':
+        return 'Completed'
+      case 'pending':
+        return 'Pending'
+      default:
+        return status
+    }
+  }
 
-  if (testCompleted) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
-          <div className="text-green-500 text-5xl mb-4">✓</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">
-            Тест завершен!
-          </h2>
-          <p className="text-gray-600 mb-4">Ваши ответы успешно отправлены.</p>
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">Потраченное время:</p>
-            <p className="font-mono">
-              {formatTime(testData?.time_limit * 60 - timeLeft)}
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Вернуться на главную
-          </button>
-        </div>
-      </div>
-    )
+  // Получаем количество тестов (в реальном приложении это нужно получать из API)
+  const getTestsCompleted = (candidate) => {
+    // Здесь можно добавить логику для получения реального количества тестов
+    return candidate.tests_completed || 0
+  }
+
+  // Форматируем дату
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  // Получаем уникальные позиции для фильтра
+  const getUniquePositions = () => {
+    const positions = candidates.map((c) => c.position).filter(Boolean)
+    return [...new Set(positions)]
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Заголовок теста */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                {testData?.title || 'Тест для кандидата'}
-              </h1>
-              <p className="text-gray-600">
-                {testData?.description || 'Вопросы от HR и TechLead'}
-              </p>
-            </div>
-
-            <div
-              className={`px-6 py-3 rounded-lg text-center ${timeLeft < 60 ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'}`}
-            >
-              <div className="text-sm text-gray-600 mb-1">Осталось времени</div>
-              <div
-                className={`text-2xl font-mono font-bold ${timeLeft < 60 ? 'text-red-600' : 'text-blue-600'}`}
-              >
-                {formatTime(timeLeft)}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>
-                Вопрос {currentQuestionIndex + 1} из {questions.length}
-              </span>
-              <span>{Math.round(progress)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div
-                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Основной контейнер с двумя колонками */}
         <div className="flex flex-col lg:flex-row gap-6">
+          {/* ЛЕВАЯ КОЛОНКА: Список кандидатов */}
           <div className="lg:w-2/3">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${currentQuestion.type === 'hr' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}
-                  >
-                    {currentQuestion.category}
-                  </span>
-                  <div className="text-sm text-gray-500">
-                    Вопрос {currentQuestion.id}
-                  </div>
-                </div>
-              </div>
+            <div className="bg-white rounded-lg shadow-sm border border-neutral-100 overflow-hidden">
+              {/* Заголовок и кнопка импорта */}
+              <header className="px-4 md:px-6 py-4 border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h1 className="text-neutral-700 text-xl md:text-2xl font-extrabold font-['Inter']">
+                  Candidates
+                </h1>
 
-              <div className="p-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-6">
-                  {currentQuestion.question}
-                </h2>
-
-                {currentQuestion.questionType === 'text' && (
-                  <div className="space-y-2">
-                    <textarea
-                      value={answers[currentQuestion.id] || ''}
-                      onChange={(e) =>
-                        handleAnswerChange(currentQuestion.id, e.target.value)
-                      }
-                      className="w-full h-48 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                      placeholder="Введите ваш ответ здесь..."
-                      maxLength={currentQuestion.maxLength}
-                    />
-                    <div className="text-right text-sm text-gray-500">
-                      {(answers[currentQuestion.id] || '').length}/
-                      {currentQuestion.maxLength} символов
-                    </div>
-                  </div>
-                )}
-
-                {currentQuestion.questionType === 'single' && (
-                  <div className="space-y-3">
-                    {currentQuestion.options.map((option, index) => (
-                      <label
-                        key={index}
-                        className={`flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${
-                          answers[currentQuestion.id] === index
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name={`question-${currentQuestion.id}`}
-                          checked={answers[currentQuestion.id] === index}
-                          onChange={() =>
-                            handleSingleSelect(currentQuestion.id, index)
-                          }
-                          className="h-4 w-4 text-blue-600"
-                        />
-                        <span className="ml-3">{option}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                {currentQuestion.questionType === 'multiple' && (
-                  <div className="space-y-3">
-                    {currentQuestion.options.map((option, index) => (
-                      <label
-                        key={index}
-                        className={`flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${
-                          (answers[currentQuestion.id] || []).includes(index)
-                            ? 'border-green-500 bg-green-50'
-                            : 'border-gray-200'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={(answers[currentQuestion.id] || []).includes(
-                            index
-                          )}
-                          onChange={() =>
-                            handleMultipleSelect(currentQuestion.id, index)
-                          }
-                          className="h-4 w-4 text-green-600 rounded"
-                        />
-                        <span className="ml-3">{option}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
                 <button
-                  onClick={handlePrevQuestion}
-                  disabled={currentQuestionIndex === 0}
-                  className={`px-4 py-2 rounded ${
-                    currentQuestionIndex === 0
-                      ? 'bg-gray-100 text-gray-400'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+                  onClick={handleImportCandidates}
+                  className="px-4 py-2 bg-slate-500 rounded text-white text-sm font-medium hover:bg-slate-600 transition-colors whitespace-nowrap"
+                  aria-label="Import candidates"
                 >
-                  ← Назад
+                  Import Candidates
                 </button>
+              </header>
 
-                {currentQuestionIndex < questions.length - 1 ? (
+              {/* Поиск и фильтры */}
+              <div className="p-4 md:p-6 border-b border-zinc-200 space-y-4">
+                {/* Форма поиска */}
+                <form
+                  onSubmit={handleSearchSubmit}
+                  className="flex flex-col sm:flex-row gap-3"
+                  role="search"
+                >
+                  <div className="flex-1">
+                    <input
+                      type="search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search candidate by name, email or position..."
+                      className="w-full px-4 py-3 text-neutral-700 text-sm font-normal bg-white rounded-lg border border-zinc-200 outline-none placeholder:text-neutral-400"
+                      aria-label="Search candidates"
+                    />
+                  </div>
                   <button
-                    onClick={handleNextQuestion}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    type="submit"
+                    className="px-6 py-3 bg-slate-500 rounded-lg text-white text-sm font-medium hover:bg-slate-600 transition-colors whitespace-nowrap"
+                    aria-label="Search"
                   >
-                    Далее →
+                    Search
                   </button>
-                ) : (
-                  <button
-                    onClick={handleTestSubmit}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                </form>
+
+                {/* Фильтры */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <select
+                    name="status"
+                    value={filters.status}
+                    onChange={handleFilterChange}
+                    className="px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm font-normal"
                   >
-                    Завершить
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                  </select>
 
-          <div className="lg:w-1/3">
-            <div className="sticky top-6 space-y-4">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                <h3 className="font-semibold text-gray-800 mb-3">Навигация</h3>
-                <div className="grid grid-cols-5 gap-2">
-                  {questions.map((question, index) => (
-                    <button
-                      key={question.id}
-                      onClick={() => handleQuestionSelect(index)}
-                      className={`aspect-square rounded-lg flex items-center justify-center text-sm ${
-                        currentQuestionIndex === index
-                          ? 'bg-blue-600 text-white'
-                          : answers[question.id]
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {index + 1}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                  <select
+                    name="position"
+                    value={filters.position}
+                    onChange={handleFilterChange}
+                    className="px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm font-normal"
+                  >
+                    <option value="">All Positions</option>
+                    {getUniquePositions().map((position, index) => (
+                      <option key={index} value={position}>
+                        {position}
+                      </option>
+                    ))}
+                  </select>
 
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                <h3 className="font-semibold text-gray-800 mb-3">Статистика</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Отвечено:</span>
-                    <span className="font-medium">
-                      {Object.keys(answers).length}/{questions.length}
+                  <div className="flex items-center text-sm text-gray-600">
+                    <span>
+                      Showing {candidates.length} candidate
+                      {candidates.length !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Осталось времени:</span>
-                    <span className="font-mono">{formatTime(timeLeft)}</span>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600 text-sm">{error}</p>
                   </div>
-                  <button
-                    onClick={handleTestSubmit}
-                    className="w-full mt-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-                  >
-                    Отправить досрочно
-                  </button>
+                )}
+              </div>
+
+              {/* Таблица кандидатов */}
+              <div className="overflow-x-auto">
+                {/* Заголовки таблицы */}
+                <div className="grid grid-cols-12 bg-gray-50 border-b border-zinc-200 min-w-200">
+                  <div className="col-span-12 md:col-span-4 p-4">
+                    <span className="text-neutral-700 text-sm font-bold font-['Inter']">
+                      Name & Email
+                    </span>
+                  </div>
+                  <div className="col-span-6 md:col-span-2 p-4">
+                    <span className="text-neutral-700 text-sm font-bold font-['Inter']">
+                      Position
+                    </span>
+                  </div>
+                  <div className="col-span-6 md:col-span-2 p-4">
+                    <span className="text-neutral-700 text-sm font-bold font-['Inter']">
+                      Status
+                    </span>
+                  </div>
+                  <div className="col-span-12 md:col-span-2 p-4 hidden md:block">
+                    <span className="text-neutral-700 text-sm font-bold font-['Inter']">
+                      Date Added
+                    </span>
+                  </div>
+                  <div className="col-span-12 md:col-span-2 p-4">
+                    <span className="text-neutral-700 text-sm font-bold font-['Inter']">
+                      Actions
+                    </span>
+                  </div>
+                </div>
+
+                {/* Список кандидатов */}
+                <div className="min-w-200">
+                  {loading ? (
+                    <div className="text-center py-8 text-gray-500">
+                      Loading candidates...
+                    </div>
+                  ) : candidates.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      {searchQuery || filters.status || filters.position
+                        ? 'No candidates found for your search'
+                        : 'No candidates found. Import or add candidates'}
+                    </div>
+                  ) : (
+                    candidates.map((candidate, index) => (
+                      <div
+                        key={candidate.id}
+                        className={`grid grid-cols-12 border-b border-zinc-200 hover:bg-gray-50 ${
+                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                        }`}
+                      >
+                        {/* Имя и Email */}
+                        <div className="col-span-12 md:col-span-4 p-4">
+                          <div className="space-y-1">
+                            <div className="text-neutral-700 text-sm font-medium font-['Inter']">
+                              {candidate.full_name}
+                            </div>
+                            <div className="text-neutral-500 text-xs">
+                              {candidate.email}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Позиция */}
+                        <div className="col-span-6 md:col-span-2 p-4">
+                          <div className="text-neutral-700 text-sm font-normal font-['Inter']">
+                            {candidate.position || 'Not specified'}
+                          </div>
+                          <div className="text-neutral-500 text-xs">
+                            {getTestsCompleted(candidate)} test
+                            {getTestsCompleted(candidate) !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+
+                        {/* Статус */}
+                        <div className="col-span-6 md:col-span-2 p-4">
+                          <span
+                            className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(candidate.status)}`}
+                          >
+                            {getStatusText(candidate.status)}
+                          </span>
+                        </div>
+
+                        {/* Дата добавления */}
+                        <div className="col-span-12 md:col-span-2 p-4 hidden md:block">
+                          <div className="text-neutral-700 text-sm font-normal">
+                            {formatDate(candidate.created_at)}
+                          </div>
+                        </div>
+
+                        {/* Действия */}
+                        <div className="col-span-12 md:col-span-2 p-4">
+                          <div className="flex flex-wrap gap-1">
+                            <button
+                              onClick={() => handleSendTest(candidate)}
+                              className="px-2 py-1 bg-blue-600 rounded text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+                              title="Send Test"
+                            >
+                              Send
+                            </button>
+                            <button
+                              onClick={() => handleViewDetails(candidate)}
+                              className="px-2 py-1 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
+                              title="View Details"
+                            >
+                              Details
+                            </button>
+                            <button
+                              onClick={() => handleEditCandidate(candidate)}
+                              className="px-2 py-1 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
+                              title="Edit"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleDeleteCandidate(candidate.id)
+                              }
+                              className="px-2 py-1 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
+                              title="Delete"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* ПРАВАЯ КОЛОНКА: Форма добавления кандидата */}
+          <div className="lg:w-1/3">
+            <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-neutral-100 overflow-hidden sticky top-6">
+              {/* Заголовок формы */}
+              <header className="px-6 py-4 border-b border-zinc-200">
+                <h2 className="text-neutral-700 text-xl font-extrabold font-['Inter'] text-center">
+                  Add New Candidate
+                </h2>
+              </header>
+
+              {/* Форма добавления кандидата */}
+              <form
+                onSubmit={handleAddCandidate}
+                className="p-4 md:p-6 space-y-6"
+              >
+                <div className="space-y-4">
+                  {/* Имя */}
+                  <div>
+                    <label className="block text-neutral-700 text-sm font-medium mb-2">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      name="full_name"
+                      value={newCandidate.full_name}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
+                      placeholder="Enter full name"
+                      required
+                    />
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-neutral-700 text-sm font-medium mb-2">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={newCandidate.email}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
+                      placeholder="Enter email address"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Позиция */}
+                  <div>
+                    <label className="block text-neutral-700 text-sm font-medium mb-2">
+                      Position
+                    </label>
+                    <input
+                      type="text"
+                      name="position"
+                      value={newCandidate.position}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
+                      placeholder="e.g., Frontend Developer"
+                      required
+                    />
+                  </div>
+
+                  {/* Статус */}
+                  <div>
+                    <label className="block text-neutral-700 text-sm font-medium mb-2">
+                      Status
+                    </label>
+                    <select
+                      name="status"
+                      value={newCandidate.status}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="active">Active</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Комментарий */}
+                <div>
+                  <label className="block text-neutral-700 text-sm font-medium mb-2">
+                    Notes (Optional)
+                  </label>
+                  <textarea
+                    name="notes"
+                    value={newCandidate.notes}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm resize-none"
+                    placeholder="Add any notes about this candidate..."
+                    rows={3}
+                  />
+                </div>
+
+                {/* Кнопки */}
+                <div className="flex justify-center gap-4 pt-4">
+                  <button
+                    type="button"
+                    onClick={handleClearForm}
+                    className="px-4 py-2 bg-gray-200 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-300 transition-colors"
+                  >
+                    Clear
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-slate-500 rounded-lg text-white text-sm font-medium hover:bg-slate-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    disabled={
+                      !newCandidate.full_name ||
+                      !newCandidate.email ||
+                      !newCandidate.position
+                    }
+                  >
+                    Add Candidate
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
