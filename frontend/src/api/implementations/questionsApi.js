@@ -20,7 +20,7 @@ export const questionsService = {
   },
 
   async updateQuestion(id, data) {
-    const response = await apiClient.put(`${ENDPOINT}//${id}/`, data)
+    const response = await apiClient.put(`${ENDPOINT}/${id}/`, data)
     return response.data
   },
 
