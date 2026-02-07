@@ -1,95 +1,118 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { testsService } from '../api/tests'
+import { questionsService } from '../api/questions'
 
 export function Tests() {
   const [searchQuery, setSearchQuery] = useState('')
   const [questionSearch, setQuestionSearch] = useState('')
   const [newTest, setNewTest] = useState({
-    name: '',
+    title: '',
     description: '',
-    timeLimit: '',
-    selectedQuestions: [],
+    time_limit: '',
+    test_questions: [],
   })
 
-  // Пример данных тестов
-  const [tests, setTests] = useState([
-    {
-      id: 1,
-      name: 'Java Middle v.1',
-      description:
-        'Explain the difference between let, const, and var in JavaScript',
-      questionsCount: 15,
-      timeLimit: 60,
-    },
-    {
-      id: 2,
-      name: 'Python Backend',
-      description: 'Comprehensive Python backend development test',
-      questionsCount: 20,
-      timeLimit: 90,
-    },
-    {
-      id: 3,
-      name: 'DevOps',
-      description: 'DevOps tools and practices assessment',
-      questionsCount: 25,
-      timeLimit: 120,
-    },
-  ])
+  const [tests, setTests] = useState([])
+  const [availableQuestions, setAvailableQuestions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadingQuestions, setLoadingQuestions] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Пример вопросов для добавления в тест
-  // eslint-disable-next-line no-unused-vars
-  const [availableQuestions, setAvailableQuestions] = useState([
-    {
-      id: 1,
-      text: 'Explain the difference between let, const, and var in JavaScript',
-      type: 'coding',
-    },
-    {
-      id: 2,
-      text: 'What is the time complexity of quicksort in the worst case?',
-      type: 'theory',
-    },
-    {
-      id: 3,
-      text: 'Implement a function to reverse a linked list',
-      type: 'coding',
-    },
-    { id: 4, text: 'Describe the SOLID principles', type: 'theory' },
-    { id: 5, text: 'What is Docker and how does it work?', type: 'devops' },
-  ])
+  // Загрузка тестов
+  const fetchTests = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const params = {}
+      if (searchQuery) {
+        params.search = searchQuery
+      }
+
+      const response = await testsService.getAllTests(params)
+      setTests(response)
+    } catch (err) {
+      setError('Failed to load tests')
+      console.error('Error fetching tests:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [searchQuery])
+
+  const fetchAvailableQuestions = useCallback(async () => {
+    try {
+      setLoadingQuestions(true)
+      const params = {}
+      if (questionSearch) {
+        params.search = questionSearch
+      }
+
+      const response = await questionsService.getAllQuestions(params)
+      setAvailableQuestions(response)
+    } catch (err) {
+      console.error('Error fetching questions:', err)
+    } finally {
+      setLoadingQuestions(false)
+    }
+  }, [questionSearch])
+
+  useEffect(() => {
+    fetchTests()
+    fetchAvailableQuestions()
+  }, [fetchTests, fetchAvailableQuestions])
+
+  // Первоначальная загрузка данных
+  useEffect(() => {
+    fetchTests()
+    fetchAvailableQuestions()
+  }, [fetchTests, fetchAvailableQuestions])
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
-    console.log('Search tests:', searchQuery)
+    fetchTests()
   }
 
   const handleQuestionSearch = (e) => {
     e.preventDefault()
-    console.log('Search questions:', questionSearch)
+    fetchAvailableQuestions()
   }
 
-  const handleCreateTest = (e) => {
+  const handleCreateTest = async (e) => {
     e.preventDefault()
-    console.log('Creating test:', newTest)
 
-    // Добавляем новый тест
-    const newTestObj = {
-      id: tests.length + 1,
-      name: newTest.name,
-      description: newTest.description,
-      questionsCount: newTest.selectedQuestions.length,
-      timeLimit: parseInt(newTest.timeLimit) || 0,
+    try {
+      setError(null)
+
+      // Формируем данные для API
+      const testData = {
+        title: newTest.title,
+        description: newTest.description,
+        time_limit: newTest.time_limit ? parseInt(newTest.time_limit) : null,
+        test_questions: newTest.test_questions.map((questionId) => ({
+          question: questionId,
+          order: newTest.test_questions.indexOf(questionId) + 1,
+        })),
+      }
+
+      const response = await testsService.createTest(testData)
+
+      // Обновляем список тестов
+      setTests([...tests, response])
+
+      // Очищаем форму
+      setNewTest({
+        title: '',
+        description: '',
+        time_limit: '',
+        test_questions: [],
+      })
+
+      // Обновляем список тестов
+      await fetchTests()
+    } catch (err) {
+      setError('Failed to create test')
+      console.error('Error creating test:', err)
     }
-
-    setTests([...tests, newTestObj])
-
-    // Очищаем форму
-    setNewTest({
-      name: '',
-      description: '',
-      timeLimit: '',
-      selectedQuestions: [],
-    })
   }
 
   const handleInputChange = (e) => {
@@ -101,10 +124,10 @@ export function Tests() {
   }
 
   const handleAddQuestion = (questionId) => {
-    if (!newTest.selectedQuestions.includes(questionId)) {
+    if (!newTest.test_questions.includes(questionId)) {
       setNewTest((prev) => ({
         ...prev,
-        selectedQuestions: [...prev.selectedQuestions, questionId],
+        test_questions: [...prev.test_questions, questionId],
       }))
     }
   }
@@ -112,30 +135,59 @@ export function Tests() {
   const handleRemoveQuestion = (questionId) => {
     setNewTest((prev) => ({
       ...prev,
-      selectedQuestions: prev.selectedQuestions.filter(
-        (id) => id !== questionId
-      ),
+      test_questions: prev.test_questions.filter((id) => id !== questionId),
     }))
   }
 
-  const handleDeleteTest = (testId) => {
-    setTests(tests.filter((test) => test.id !== testId))
+  const handleDeleteTest = async (testId) => {
+    if (!window.confirm('Are you sure you want to delete this test?')) {
+      return
+    }
+
+    try {
+      setError(null)
+      await testsService.deleteTest(testId)
+      setTests(tests.filter((test) => test.id !== testId))
+    } catch (err) {
+      setError('Failed to delete test')
+      console.error('Error deleting test:', err)
+    }
   }
 
   const handleEditTest = (test) => {
     console.log('Edit test:', test)
-    // Здесь логика для редактирования теста
+    // TODO: Реализовать редактирование теста
+    alert('Edit functionality will be implemented soon')
   }
 
   const handleViewDetails = (test) => {
-    console.log('View details:', test)
-    // Здесь логика для просмотра деталей
+    const details = `
+Test Details:
+Title: ${test.title}
+Description: ${test.description}
+Time Limit: ${test.time_limit || 'No limit'} minutes
+Questions: ${test.test_questions?.length || 0}
+Created: ${new Date(test.created_at).toLocaleDateString()}
+Last Updated: ${new Date(test.updated_at).toLocaleDateString()}
+    `
+    alert(details)
   }
 
   // Фильтрация вопросов по поиску
-  const filteredQuestions = availableQuestions.filter((question) =>
-    question.text.toLowerCase().includes(questionSearch.toLowerCase())
+  const filteredQuestions = availableQuestions.filter(
+    (question) =>
+      question.title?.toLowerCase().includes(questionSearch.toLowerCase()) ||
+      question.text?.toLowerCase().includes(questionSearch.toLowerCase())
   )
+
+  // Получаем выбранные вопросы
+  const getSelectedQuestions = () => {
+    return availableQuestions.filter((q) =>
+      newTest.test_questions.includes(q.id)
+    )
+  }
+
+  const selectedQuestions = getSelectedQuestions()
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -154,13 +206,16 @@ export function Tests() {
                 <button
                   className="px-4 py-2 bg-slate-500 rounded text-white text-sm font-medium hover:bg-slate-600 transition-colors"
                   aria-label="Импортировать тесты"
+                  onClick={() =>
+                    alert('Import functionality will be implemented soon')
+                  }
                 >
                   Import Tests
                 </button>
               </header>
 
               {/* Форма поиска */}
-              <div className="p-4 md:p-6 border-b border-zinc-200">
+              <div className="p-4 md:p-6 border-b border-zinc-200 space-y-4">
                 <form
                   onSubmit={handleSearchSubmit}
                   className="flex flex-col sm:flex-row gap-3"
@@ -184,6 +239,12 @@ export function Tests() {
                     Search
                   </button>
                 </form>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                )}
               </div>
 
               {/* Таблица тестов */}
@@ -209,9 +270,15 @@ export function Tests() {
 
                 {/* Список тестов */}
                 <div className="min-w-200">
-                  {tests.length === 0 ? (
+                  {loading ? (
                     <div className="text-center py-8 text-gray-500">
-                      No tests found. Create your first test.
+                      Loading tests...
+                    </div>
+                  ) : tests.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      {searchQuery
+                        ? 'No tests found for your search'
+                        : 'No tests found. Create your first test.'}
                     </div>
                   ) : (
                     tests.map((test, index) => (
@@ -224,18 +291,18 @@ export function Tests() {
                         {/* Название теста */}
                         <div className="col-span-12 md:col-span-3 p-4">
                           <div className="text-neutral-700 text-sm font-normal font-['Inter'] mb-1">
-                            {test.name}
+                            {test.title}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {test.questionsCount} questions • {test.timeLimit}{' '}
-                            min
+                            {test.test_questions?.length || 0} questions •{' '}
+                            {test.time_limit || 'No limit'} min
                           </div>
                         </div>
 
                         {/* Описание */}
                         <div className="col-span-12 md:col-span-6 p-4 hidden md:block">
                           <p className="text-neutral-700 text-sm font-normal font-['Inter'] line-clamp-2">
-                            {test.description}
+                            {test.description || 'No description'}
                           </p>
                         </div>
 
@@ -275,7 +342,7 @@ export function Tests() {
 
           {/* ПРАВАЯ КОЛОНКА: Создание теста */}
           <div className="lg:w-1/3">
-            <div className="bg-white rounded-2xl md:rounded-3xl lg:rounded-[60px] shadow-sm border border-neutral-100 overflow-hidden">
+            <div className="bg-white rounded-2xl md:rounded-3xl lg:rounded-[60px] shadow-sm border border-neutral-100 overflow-hidden sticky top-6">
               {/* Заголовок формы */}
               <header className="px-6 py-4 border-b border-zinc-200">
                 <h2 className="text-neutral-700 text-xl font-extrabold font-['Inter'] text-center">
@@ -291,16 +358,16 @@ export function Tests() {
                 {/* Название теста */}
                 <div>
                   <label
-                    htmlFor="test-name"
+                    htmlFor="test-title"
                     className="block text-neutral-700 text-sm font-medium mb-2"
                   >
                     Test name
                   </label>
                   <input
                     type="text"
-                    id="test-name"
-                    name="name"
-                    value={newTest.name}
+                    id="test-title"
+                    name="title"
+                    value={newTest.title}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
                     placeholder="Enter test name"
@@ -338,15 +405,15 @@ export function Tests() {
                   <input
                     type="number"
                     id="time-limit"
-                    name="timeLimit"
-                    value={newTest.timeLimit}
+                    name="time_limit"
+                    value={newTest.time_limit}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
                     placeholder="0 for no limit"
                     min="0"
                   />
                   <p className="text-xs text-neutral-400 mt-1">
-                    In minutes (0 - без ограничения)
+                    In minutes (0 or empty - no limit)
                   </p>
                 </div>
 
@@ -357,7 +424,7 @@ export function Tests() {
                       Questions
                     </label>
                     <span className="text-xs text-gray-500">
-                      {newTest.selectedQuestions.length} selected
+                      {newTest.test_questions.length} selected
                     </span>
                   </div>
 
@@ -373,16 +440,23 @@ export function Tests() {
                     <button
                       type="submit"
                       className="px-4 py-2 bg-slate-500 rounded-lg text-white text-sm font-medium hover:bg-slate-600 transition-colors"
+                      disabled={loadingQuestions}
                     >
-                      Search
+                      {loadingQuestions ? 'Loading...' : 'Search'}
                     </button>
                   </form>
 
                   {/* Список доступных вопросов */}
                   <div className="border border-zinc-200 rounded-lg max-h-60 overflow-y-auto">
-                    {filteredQuestions.length === 0 ? (
+                    {loadingQuestions ? (
                       <div className="p-4 text-center text-gray-500 text-sm">
-                        No questions found
+                        Loading questions...
+                      </div>
+                    ) : filteredQuestions.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500 text-sm">
+                        {questionSearch
+                          ? 'No questions found for your search'
+                          : 'No questions available'}
                       </div>
                     ) : (
                       filteredQuestions.map((question) => (
@@ -392,25 +466,38 @@ export function Tests() {
                         >
                           <div className="flex-1">
                             <p className="text-neutral-700 text-sm font-normal line-clamp-2">
-                              {question.text}
+                              {question.title || question.text}
                             </p>
-                            <span className="text-xs text-gray-500">
-                              {question.type}
-                            </span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-500">
+                                {question.question_type}
+                              </span>
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded ${
+                                  question.question_complexity === 'easy'
+                                    ? 'bg-green-100 text-green-800'
+                                    : question.question_complexity === 'medium'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {question.question_complexity}
+                              </span>
+                            </div>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleAddQuestion(question.id)}
-                            disabled={newTest.selectedQuestions.includes(
+                            disabled={newTest.test_questions.includes(
                               question.id
                             )}
-                            className={`ml-2 px-3 py-1 rounded text-xs font-medium transition-colors ${
-                              newTest.selectedQuestions.includes(question.id)
+                            className={`ml-2 px-3 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+                              newTest.test_questions.includes(question.id)
                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                 : 'bg-purple-800 text-white hover:bg-purple-900'
                             }`}
                           >
-                            {newTest.selectedQuestions.includes(question.id)
+                            {newTest.test_questions.includes(question.id)
                               ? 'Added'
                               : 'Add'}
                           </button>
@@ -420,35 +507,35 @@ export function Tests() {
                   </div>
 
                   {/* Выбранные вопросы */}
-                  {newTest.selectedQuestions.length > 0 && (
+                  {selectedQuestions.length > 0 && (
                     <div className="space-y-2">
                       <h4 className="text-sm font-medium text-neutral-700">
                         Selected Questions:
                       </h4>
                       <div className="space-y-2">
-                        {availableQuestions
-                          .filter((q) =>
-                            newTest.selectedQuestions.includes(q.id)
-                          )
-                          .map((question) => (
-                            <div
-                              key={question.id}
-                              className="flex justify-between items-center p-2 bg-gray-50 rounded"
-                            >
-                              <span className="text-sm text-neutral-700 truncate">
-                                {question.text}
+                        {selectedQuestions.map((question) => (
+                          <div
+                            key={question.id}
+                            className="flex justify-between items-center p-2 bg-gray-50 rounded"
+                          >
+                            <div className="flex-1">
+                              <span className="text-sm text-neutral-700 truncate block">
+                                {question.title || question.text}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleRemoveQuestion(question.id)
-                                }
-                                className="ml-2 px-2 py-1 bg-pink-800 rounded text-xs text-white hover:bg-pink-900 transition-colors"
-                              >
-                                Remove
-                              </button>
+                              <span className="text-xs text-gray-500">
+                                {question.question_type} •{' '}
+                                {question.question_complexity}
+                              </span>
                             </div>
-                          ))}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveQuestion(question.id)}
+                              className="ml-2 px-2 py-1 bg-pink-800 rounded text-xs text-white hover:bg-pink-900 transition-colors whitespace-nowrap"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -458,7 +545,10 @@ export function Tests() {
                 <div className="pt-4">
                   <button
                     type="submit"
-                    className="w-full py-3 bg-slate-500 rounded-xl text-white text-lg font-medium hover:bg-slate-600 transition-colors"
+                    className="w-full py-3 bg-slate-500 rounded-xl text-white text-lg font-medium hover:bg-slate-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    disabled={
+                      !newTest.title || newTest.test_questions.length === 0
+                    }
                   >
                     Create Test
                   </button>

@@ -4,8 +4,8 @@ import { API_ROUTES } from '../config/endpoints'
 const ENDPOINT = API_ROUTES.TESTS
 
 export const testsService = {
-  async getAllTests() {
-    const response = await apiClient.get(`${ENDPOINT}/`)
+  async getAllTests(params = {}) {
+    const response = await apiClient.get(`${ENDPOINT}/`, { params })
     return response.data
   },
 
