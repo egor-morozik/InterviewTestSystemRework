@@ -1,12 +1,13 @@
 services:
-
   redis:
     image: redis:7-alpine 
     ports:
       - "6379:6379"         
       
   backend:
-    build: ./backend 
+    build:
+      context: . 
+      dockerfile: backend/Dockerfile
     volumes:
       - ./backend:/app
       - /app/.venv
@@ -17,7 +18,7 @@ services:
 
   nginx:
     build:
-      context: .
+      context: . 
       dockerfile: frontend/Dockerfile
     ports:
       - "80:80"                

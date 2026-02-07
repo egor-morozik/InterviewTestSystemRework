@@ -23,17 +23,14 @@ jobs:
         with:
           context: .
           file: ./backend/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
-      
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
+
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./frontend/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ github.sha }}
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+
