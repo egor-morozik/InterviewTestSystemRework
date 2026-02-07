@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { questionsService } from '../api/questions'
+import { questionsService } from '../api/implementations/questionsApi'
 
 export function Questions() {
   const [searchQuery, setSearchQuery] = useState('')

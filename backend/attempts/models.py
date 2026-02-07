@@ -44,7 +44,7 @@ class Attempt(models.Model):
     total_score = models.PositiveSmallIntegerField(
         "Общий балл",
         null=True,
-        black=True,
+        blank=True,
     )
 
     candidate = models.ForeignKey(
