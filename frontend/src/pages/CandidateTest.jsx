@@ -6,7 +6,7 @@ import { candidateService } from '../api/implementations/candidateApi'
 export function CandidateTest() {
   const { testId } = useParams() // Получаем ID теста из URL
   const navigate = useNavigate()
-  
+
   const [timeLeft, setTimeLeft] = useState(0)
   const [isTimerRunning, setIsTimerRunning] = useState(true)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -31,11 +31,11 @@ export function CandidateTest() {
       try {
         setLoading(true)
         setError(null)
-        
+
         // Загружаем данные теста
         const testResponse = await testsService.getTest(testId)
         setTestData(testResponse)
-        
+
         // Извлекаем вопросы из теста
         const testQuestions = testResponse.test_questions || []
         const formattedQuestions = testQuestions.map((tq, index) => {
@@ -43,22 +43,28 @@ export function CandidateTest() {
           return {
             id: question.id,
             type: question.question_type,
-            category: question.question_type === 'hr' ? 'HR Questions' : 'Tech Questions',
+            category:
+              question.question_type === 'hr'
+                ? 'HR Questions'
+                : 'Tech Questions',
             question: question.title || question.text || '',
-            questionType: question.question_type === 'multiple' ? 'multiple' : 
-                        question.question_type === 'single' ? 'single' : 'text',
+            questionType:
+              question.question_type === 'multiple'
+                ? 'multiple'
+                : question.question_type === 'single'
+                  ? 'single'
+                  : 'text',
             maxLength: 1000,
-            options: question.choices?.map(choice => choice.text) || [],
-            order: index + 1 // <-- используем index
+            options: question.choices?.map((choice) => choice.text) || [],
+            order: index + 1, // <-- используем index
           }
         })
-        
+
         setQuestions(formattedQuestions)
-        
+
         // Устанавливаем таймер на основе time_limit теста
         const timeLimit = testResponse.time_limit || 300 // 5 минут по умолчанию
         setTimeLeft(timeLimit * 60) // конвертируем минуты в секунды
-        
       } catch (err) {
         setError('Failed to load test')
         console.error('Error fetching test:', err)
@@ -139,52 +145,58 @@ export function CandidateTest() {
 
   const handleTestSubmit = useCallback(async () => {
     if (testCompleted) return
-    
+
     try {
       setIsTimerRunning(false)
       setTestCompleted(true)
-      
+
       // Форматируем ответы для отправки
-      const formattedAnswers = Object.entries(answers).map(([questionId, answer]) => {
-        const question = questions.find(q => q.id === parseInt(questionId))
-        
-        let answerValue = answer
-        
-        // Для множественного выбора конвертируем индексы в текст
-        if (question?.questionType === 'multiple' && Array.isArray(answer)) {
-          answerValue = answer.map(idx => question.options[idx]).join('; ')
+      const formattedAnswers = Object.entries(answers).map(
+        ([questionId, answer]) => {
+          const question = questions.find((q) => q.id === parseInt(questionId))
+
+          let answerValue = answer
+
+          // Для множественного выбора конвертируем индексы в текст
+          if (question?.questionType === 'multiple' && Array.isArray(answer)) {
+            answerValue = answer.map((idx) => question.options[idx]).join('; ')
+          }
+          // Для одиночного выбора конвертируем индекс в текст
+          else if (
+            question?.questionType === 'single' &&
+            typeof answer === 'number'
+          ) {
+            answerValue = question.options[answer]
+          }
+
+          return {
+            question: parseInt(questionId),
+            answer: answerValue,
+          }
         }
-        // Для одиночного выбора конвертируем индекс в текст
-        else if (question?.questionType === 'single' && typeof answer === 'number') {
-          answerValue = question.options[answer]
-        }
-        
-        return {
-          question: parseInt(questionId),
-          answer: answerValue
-        }
-      })
+      )
 
       // Данные кандидата (в реальном приложении нужно получать из формы входа)
       const candidateData = {
         test: testId,
-        full_name: "Кандидат", // Заменить на реальные данные
-        email: "candidate@example.com", // Заменить на реальные данные
+        full_name: 'Кандидат', // Заменить на реальные данные
+        email: 'candidate@example.com', // Заменить на реальные данные
         answers: formattedAnswers,
-        time_spent: (testData?.time_limit * 60) - timeLeft, // потраченное время в секундах
-        status: "completed"
+        time_spent: testData?.time_limit * 60 - timeLeft, // потраченное время в секундах
+        status: 'completed',
       }
 
       // Отправляем результаты теста
       await candidateService.createCandidate(candidateData)
-      
+
       console.log('Test submitted:', answers)
-      
     } catch (err) {
       setError('Failed to submit test')
       console.error('Error submitting test:', err)
       // Показываем ошибку, но оставляем тест завершенным
-      alert('Произошла ошибка при отправке результатов. Пожалуйста, свяжитесь с администратором.')
+      alert(
+        'Произошла ошибка при отправке результатов. Пожалуйста, свяжитесь с администратором.'
+      )
     }
   }, [answers, testCompleted, questions, testId, testData, timeLeft])
 
@@ -194,7 +206,9 @@ export function CandidateTest() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Загрузка теста...</h2>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">
+            Загрузка теста...
+          </h2>
           <p className="text-gray-600">Пожалуйста, подождите</p>
         </div>
       </div>
@@ -226,7 +240,9 @@ export function CandidateTest() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
           <div className="text-yellow-500 text-5xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Тест не найден</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            Тест не найден
+          </h2>
           <p className="text-gray-600 mb-4">В этом тесте нет вопросов</p>
           <button
             onClick={() => navigate('/')}
@@ -253,7 +269,9 @@ export function CandidateTest() {
           <p className="text-gray-600 mb-4">Ваши ответы успешно отправлены.</p>
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600">Потраченное время:</p>
-            <p className="font-mono">{formatTime((testData?.time_limit * 60) - timeLeft)}</p>
+            <p className="font-mono">
+              {formatTime(testData?.time_limit * 60 - timeLeft)}
+            </p>
           </div>
           <button
             onClick={() => navigate('/')}
@@ -276,7 +294,9 @@ export function CandidateTest() {
               <h1 className="text-2xl font-bold text-gray-800 mb-2">
                 {testData?.title || 'Тест для кандидата'}
               </h1>
-              <p className="text-gray-600">{testData?.description || 'Вопросы от HR и TechLead'}</p>
+              <p className="text-gray-600">
+                {testData?.description || 'Вопросы от HR и TechLead'}
+              </p>
             </div>
 
             <div
@@ -340,7 +360,8 @@ export function CandidateTest() {
                       maxLength={currentQuestion.maxLength}
                     />
                     <div className="text-right text-sm text-gray-500">
-                      {(answers[currentQuestion.id] || '').length}/{currentQuestion.maxLength} символов
+                      {(answers[currentQuestion.id] || '').length}/
+                      {currentQuestion.maxLength} символов
                     </div>
                   </div>
                 )}

@@ -1,49 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { attemptsService } from '../api/implementations/attemptsApi'
+import { candidateService } from '../api/implementations/candidateApi'
+import { testsService } from '../api/implementations/testsApi'
 
 export function Attempts() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [attempts, setAttempts] = useState([
-    {
-      id: 1,
-      candidate: 'Alex Johnson',
-      test: 'Java Middle v.1',
-      completed: false,
-      lastSend: '3 days ago',
-      status: 'pending',
-      score: null,
-      timeSpent: null,
-    },
-    {
-      id: 2,
-      candidate: 'Maria Garcia',
-      test: 'Python Backend',
-      completed: true,
-      lastSend: '3 days ago',
-      status: 'completed',
-      score: 85,
-      timeSpent: '45 min',
-    },
-    {
-      id: 3,
-      candidate: 'David Chen',
-      test: 'DevOps',
-      completed: false,
-      lastSend: '3 days ago',
-      status: 'expired',
-      score: null,
-      timeSpent: null,
-    },
-    {
-      id: 4,
-      candidate: 'Sarah Williams',
-      test: 'Frontend React',
-      completed: true,
-      lastSend: '1 day ago',
-      status: 'completed',
-      score: 92,
-      timeSpent: '60 min',
-    },
-  ])
+  const [attempts, setAttempts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const [filters, setFilters] = useState({
     status: '',
@@ -51,29 +15,69 @@ export function Attempts() {
   })
 
   const [newAttempt, setNewAttempt] = useState({
-    candidateId: '',
-    testId: '',
-    link: '',
-    autosend: false,
+    candidate: '',
+    test: '',
+    unique_link: '',
+    send_email: false,
   })
 
-  // Пример данных для выпадающих списков
-  const [candidates] = useState([
-    { id: 1, name: 'Alex Johnson', email: 'alex@email.com' },
-    { id: 2, name: 'Maria Garcia', email: 'maria@email.com' },
-    { id: 3, name: 'David Chen', email: 'david@email.com' },
-    { id: 4, name: 'Sarah Williams', email: 'sarah@email.com' },
-  ])
+  // Данные для выпадающих списков
+  const [candidates, setCandidates] = useState([])
+  const [tests, setTests] = useState([])
+  const [loadingCandidates, setLoadingCandidates] = useState(true)
+  const [loadingTests, setLoadingTests] = useState(true)
 
-  const [tests] = useState([
-    { id: 1, name: 'Java Middle v.1', questions: 15, timeLimit: 60 },
-    { id: 2, name: 'Python Backend', questions: 20, timeLimit: 90 },
-    { id: 3, name: 'DevOps', questions: 25, timeLimit: 120 },
-    { id: 4, name: 'Frontend React', questions: 18, timeLimit: 75 },
-  ])
+  // Загрузка данных
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Загружаем попытки
+        const attemptsResponse =
+          (await attemptsService.getAllAttempts?.()) || []
+        setAttempts(Array.isArray(attemptsResponse) ? attemptsResponse : [])
+
+        // Загружаем кандидатов
+        setLoadingCandidates(true)
+        try {
+          const candidatesResponse = await candidateService.getAllCandidates()
+          setCandidates(
+            Array.isArray(candidatesResponse) ? candidatesResponse : []
+          )
+        } catch (err) {
+          console.error('Error loading candidates:', err)
+          setCandidates([])
+        } finally {
+          setLoadingCandidates(false)
+        }
+
+        // Загружаем тесты
+        setLoadingTests(true)
+        try {
+          const testsResponse = await testsService.getAllTests()
+          setTests(Array.isArray(testsResponse) ? testsResponse : [])
+        } catch (err) {
+          console.error('Error loading tests:', err)
+          setTests([])
+        } finally {
+          setLoadingTests(false)
+        }
+      } catch (err) {
+        setError('Failed to load attempts')
+        console.error('Error fetching attempts:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
+    // В реальном приложении здесь будет API запрос с поисковым запросом
     console.log('Searching attempts:', searchQuery)
   }
 
@@ -93,68 +97,133 @@ export function Attempts() {
     }))
   }
 
-  const handleCreateAttempt = (e) => {
+  const handleCreateAttempt = async (e) => {
     e.preventDefault()
 
-    const selectedCandidate = candidates.find(
-      (c) => c.id == newAttempt.candidateId
-    )
-    const selectedTest = tests.find((t) => t.id == newAttempt.testId)
+    try {
+      setError(null)
 
-    if (selectedCandidate && selectedTest) {
-      const newAttemptObj = {
-        id: attempts.length + 1,
-        candidate: selectedCandidate.name,
-        test: selectedTest.name,
-        completed: false,
-        lastSend: 'Just now',
-        status: 'pending',
-        score: null,
-        timeSpent: null,
+      // Проверяем, что выбраны кандидат и тест
+      if (!newAttempt.candidate || !newAttempt.test) {
+        alert('Please select candidate and test')
+        return
       }
 
-      setAttempts([...attempts, newAttemptObj])
+      // Формируем данные для API
+      const attemptData = {
+        candidate: parseInt(newAttempt.candidate),
+        test: parseInt(newAttempt.test),
+        unique_link: newAttempt.unique_link || generateUniqueLink(),
+        send_email: newAttempt.send_email,
+        status: 'pending',
+        completed: false,
+      }
+
+      // Отправляем запрос на создание попытки
+      const response = await attemptsService.createAttempt(attemptData)
+
+      // Обновляем список попыток
+      setAttempts((prev) => [...prev, response])
+
+      // Очищаем форму
       setNewAttempt({
-        candidateId: '',
-        testId: '',
-        link: '',
-        autosend: false,
+        candidate: '',
+        test: '',
+        unique_link: '',
+        send_email: false,
       })
 
-      console.log('Created attempt:', newAttemptObj)
+      console.log('Created attempt:', response)
+    } catch (err) {
+      setError('Failed to create attempt')
+      console.error('Error creating attempt:', err)
+      alert('Failed to create attempt. Please try again.')
     }
   }
 
-  const handleDeleteAttempt = (id) => {
-    setAttempts(attempts.filter((attempt) => attempt.id !== id))
+  const handleDeleteAttempt = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this attempt?')) {
+      return
+    }
+
+    try {
+      setError(null)
+      // В вашем API нет метода deleteAttempt, так что только локально
+      setAttempts(attempts.filter((attempt) => attempt.id !== id))
+    } catch (err) {
+      setError('Failed to delete attempt')
+      console.error('Error deleting attempt:', err)
+    }
   }
 
   const handleEditAttempt = (attempt) => {
     console.log('Editing attempt:', attempt)
+    // TODO: Реализовать редактирование попытки
+    alert('Edit functionality will be implemented soon')
   }
 
   const handleViewDetails = (attempt) => {
-    console.log('Viewing details for:', attempt)
+    const details = `
+Candidate: ${attempt.candidate?.full_name || 'Unknown'}
+Test: ${attempt.test?.title || 'Unknown'}
+Status: ${attempt.status}
+Completed: ${attempt.completed ? 'Yes' : 'No'}
+Unique Link: ${attempt.unique_link}
+Created: ${new Date(attempt.created_at).toLocaleDateString()}
+Score: ${attempt.score || 'Not evaluated'}
+Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min ${attempt.time_spent % 60} sec` : 'N/A'}
+    `
+    alert(details)
   }
 
-  const handleResendAttempt = (attempt) => {
-    console.log('Resending attempt:', attempt)
+  const handleResendAttempt = async (attempt) => {
+    try {
+      setError(null)
+
+      if (attempt.send_email) {
+        // TODO: Реализовать API для повторной отправки email
+        alert('Email resend functionality will be implemented soon')
+      } else {
+        // Просто показываем ссылку для копирования
+        const link = `${window.location.origin}/test/${attempt.unique_link}`
+        navigator.clipboard.writeText(link)
+        alert(`Link copied to clipboard: ${link}`)
+      }
+    } catch (err) {
+      setError('Failed to resend attempt')
+      console.error('Error resending attempt:', err)
+    }
   }
 
   const handleClearForm = () => {
     setNewAttempt({
-      candidateId: '',
-      testId: '',
-      link: '',
-      autosend: false,
+      candidate: '',
+      test: '',
+      unique_link: '',
+      send_email: false,
     })
+  }
+
+  // Генерация уникальной ссылки
+  const generateUniqueLink = () => {
+    const randomId = Math.random().toString(36).substr(2, 9)
+    return randomId
+  }
+
+  const handleGenerateLink = () => {
+    const uniqueLink = generateUniqueLink()
+    setNewAttempt((prev) => ({ ...prev, unique_link: uniqueLink }))
   }
 
   // Фильтрация попыток
   const filteredAttempts = attempts.filter((attempt) => {
     const matchesSearch =
-      attempt.candidate.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      attempt.test.toLowerCase().includes(searchQuery.toLowerCase())
+      (attempt.candidate?.full_name?.toLowerCase() || '').includes(
+        searchQuery.toLowerCase()
+      ) ||
+      (attempt.test?.title?.toLowerCase() || '').includes(
+        searchQuery.toLowerCase()
+      )
 
     const matchesStatus = !filters.status || attempt.status === filters.status
     const matchesCompleted =
@@ -165,11 +234,25 @@ export function Attempts() {
     return matchesSearch && matchesStatus && matchesCompleted
   })
 
-  // Генерация ссылки
-  const generateLink = () => {
-    const randomId = Math.random().toString(36).substr(2, 9)
-    const link = `https://interview-system.com/test/${randomId}`
-    setNewAttempt((prev) => ({ ...prev, link }))
+  // Получаем имя кандидата
+  const getCandidateName = (attempt) => {
+    return attempt.candidate?.full_name || 'Unknown Candidate'
+  }
+
+  // Получаем название теста
+  const getTestName = (attempt) => {
+    return attempt.test?.title || 'Unknown Test'
+  }
+
+  // Получаем статус попытки
+  const getStatusDisplay = (status) => {
+    const statusMap = {
+      pending: 'Pending',
+      completed: 'Completed',
+      expired: 'Expired',
+      in_progress: 'In Progress',
+    }
+    return statusMap[status] || status
   }
 
   return (
@@ -226,6 +309,7 @@ export function Attempts() {
                     <option value="pending">Pending</option>
                     <option value="completed">Completed</option>
                     <option value="expired">Expired</option>
+                    <option value="in_progress">In Progress</option>
                   </select>
 
                   <select
@@ -246,9 +330,15 @@ export function Attempts() {
                     </span>
                   </div>
                 </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                )}
               </div>
 
-              {/* Таблица попыток - АДАПТИВНАЯ БЕЗ ГОРИЗОНТАЛЬНОГО СКРОЛЛА */}
+              {/* Таблица попыток */}
               <div className="overflow-hidden">
                 {/* Заголовки таблицы для десктопа */}
                 <div className="hidden md:grid md:grid-cols-12 bg-gray-50 border-b border-zinc-200">
@@ -264,12 +354,12 @@ export function Attempts() {
                   </div>
                   <div className="col-span-2 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
-                      Completed
+                      Status
                     </span>
                   </div>
                   <div className="col-span-1 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
-                      Last Send
+                      Score
                     </span>
                   </div>
                   <div className="col-span-2 p-4">
@@ -281,12 +371,15 @@ export function Attempts() {
 
                 {/* Список попыток */}
                 <div>
-                  {filteredAttempts.length === 0 ? (
+                  {loading ? (
                     <div className="text-center py-8 text-gray-500 px-4">
-                      No attempts found.{' '}
-                      {searchQuery
-                        ? 'Try different search'
-                        : 'Create new attempt'}
+                      Loading attempts...
+                    </div>
+                  ) : filteredAttempts.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 px-4">
+                      {searchQuery || filters.status || filters.completed
+                        ? 'No attempts found for your search'
+                        : 'No attempts found. Create new attempt'}
                     </div>
                   ) : (
                     filteredAttempts.map((attempt, index) => (
@@ -302,10 +395,10 @@ export function Attempts() {
                             <div className="flex justify-between items-start">
                               <div>
                                 <div className="text-neutral-700 text-sm font-medium">
-                                  {attempt.candidate}
+                                  {getCandidateName(attempt)}
                                 </div>
                                 <div className="text-neutral-500 text-sm mt-1">
-                                  {attempt.test}
+                                  {getTestName(attempt)}
                                 </div>
                               </div>
                               <div className="flex flex-col items-end space-y-1">
@@ -326,18 +419,27 @@ export function Attempts() {
                                       ? 'bg-blue-100 text-blue-800'
                                       : attempt.status === 'pending'
                                         ? 'bg-yellow-100 text-yellow-800'
-                                        : 'bg-red-100 text-red-800'
+                                        : attempt.status === 'expired'
+                                          ? 'bg-red-100 text-red-800'
+                                          : 'bg-gray-100 text-gray-800'
                                   }`}
                                 >
-                                  {attempt.status}
+                                  {getStatusDisplay(attempt.status)}
                                 </span>
                               </div>
                             </div>
 
                             <div className="flex justify-between items-center text-sm text-gray-600">
-                              <span>Last send: {attempt.lastSend}</span>
-                              {attempt.score && (
-                                <span>Score: {attempt.score}%</span>
+                              <span>
+                                Created:{' '}
+                                {new Date(
+                                  attempt.created_at
+                                ).toLocaleDateString()}
+                              </span>
+                              {attempt.score !== null && (
+                                <span className="font-medium">
+                                  Score: {attempt.score}%
+                                </span>
                               )}
                             </div>
 
@@ -377,52 +479,67 @@ export function Attempts() {
                           {/* Кандидат */}
                           <div className="col-span-3 p-4">
                             <div className="text-neutral-700 text-sm font-medium">
-                              {attempt.candidate}
+                              {getCandidateName(attempt)}
                             </div>
-                            <div
-                              className={`inline-block px-2 py-1 rounded text-xs font-medium mt-1 ${
-                                attempt.status === 'completed'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : attempt.status === 'pending'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-red-100 text-red-800'
-                              }`}
-                            >
-                              {attempt.status}
+                            <div className="text-neutral-500 text-xs mt-1">
+                              {attempt.candidate?.email || 'No email'}
                             </div>
                           </div>
 
                           {/* Тест */}
                           <div className="col-span-4 p-4">
                             <div className="text-neutral-700 text-sm font-normal">
-                              {attempt.test}
+                              {getTestName(attempt)}
                             </div>
-                            {attempt.score && (
-                              <div className="text-neutral-500 text-xs mt-1">
-                                Score: {attempt.score}% • Time:{' '}
-                                {attempt.timeSpent}
-                              </div>
-                            )}
+                            <div className="text-neutral-500 text-xs mt-1">
+                              {attempt.test?.time_limit
+                                ? `${attempt.test.time_limit} min`
+                                : 'No time limit'}
+                            </div>
                           </div>
 
-                          {/* Выполнено */}
+                          {/* Статус */}
                           <div className="col-span-2 p-4">
-                            <span
-                              className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                                attempt.completed
-                                  ? 'bg-green-100 text-green-800 border border-green-200'
-                                  : 'bg-red-100 text-red-800 border border-red-200'
-                              }`}
-                            >
-                              {attempt.completed ? 'True' : 'False'}
-                            </span>
+                            <div className="space-y-1">
+                              <span
+                                className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                                  attempt.completed
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {attempt.completed
+                                  ? 'Completed'
+                                  : 'Not Completed'}
+                              </span>
+                              <span
+                                className={`block px-2 py-1 rounded text-xs font-medium mt-1 ${
+                                  attempt.status === 'completed'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : attempt.status === 'pending'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : attempt.status === 'expired'
+                                        ? 'bg-red-100 text-red-800'
+                                        : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {getStatusDisplay(attempt.status)}
+                              </span>
+                            </div>
                           </div>
 
-                          {/* Последняя отправка */}
+                          {/* Оценка */}
                           <div className="col-span-1 p-4">
                             <div className="text-neutral-700 text-sm font-normal">
-                              {attempt.lastSend}
+                              {attempt.score !== null
+                                ? `${attempt.score}%`
+                                : 'N/A'}
                             </div>
+                            {attempt.time_spent && (
+                              <div className="text-neutral-500 text-xs mt-1">
+                                {Math.floor(attempt.time_spent / 60)} min
+                              </div>
+                            )}
                           </div>
 
                           {/* Действия */}
@@ -471,7 +588,7 @@ export function Attempts() {
 
           {/* ПРАВАЯ КОЛОНКА: Создание новой попытки */}
           <div className="lg:w-1/3">
-            <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-neutral-100 overflow-hidden">
+            <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-neutral-100 overflow-hidden sticky top-6">
               {/* Заголовок формы */}
               <header className="px-6 py-4 border-b border-zinc-200">
                 <h2 className="text-neutral-700 text-xl font-extrabold font-['Inter'] text-center">
@@ -490,18 +607,25 @@ export function Attempts() {
                     Choose Candidate
                   </label>
                   <select
-                    name="candidateId"
-                    value={newAttempt.candidateId}
+                    name="candidate"
+                    value={newAttempt.candidate}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
                     required
+                    disabled={loadingCandidates}
                   >
                     <option value="">Select candidate</option>
-                    {candidates.map((candidate) => (
-                      <option key={candidate.id} value={candidate.id}>
-                        {candidate.name} ({candidate.email})
-                      </option>
-                    ))}
+                    {loadingCandidates ? (
+                      <option disabled>Loading candidates...</option>
+                    ) : candidates.length === 0 ? (
+                      <option disabled>No candidates available</option>
+                    ) : (
+                      candidates.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.full_name} ({candidate.email})
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -511,19 +635,25 @@ export function Attempts() {
                     Choose Test
                   </label>
                   <select
-                    name="testId"
-                    value={newAttempt.testId}
+                    name="test"
+                    value={newAttempt.test}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
                     required
+                    disabled={loadingTests}
                   >
                     <option value="">Select test</option>
-                    {tests.map((test) => (
-                      <option key={test.id} value={test.id}>
-                        {test.name} ({test.questions} questions,{' '}
-                        {test.timeLimit} min)
-                      </option>
-                    ))}
+                    {loadingTests ? (
+                      <option disabled>Loading tests...</option>
+                    ) : tests.length === 0 ? (
+                      <option disabled>No tests available</option>
+                    ) : (
+                      tests.map((test) => (
+                        <option key={test.id} value={test.id}>
+                          {test.title} ({test.time_limit || 'No'} min)
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -531,11 +661,11 @@ export function Attempts() {
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="block text-neutral-700 text-sm font-medium">
-                      Test Link
+                      Unique Link
                     </label>
                     <button
                       type="button"
-                      onClick={generateLink}
+                      onClick={handleGenerateLink}
                       className="text-xs text-blue-600 hover:text-blue-800"
                     >
                       Generate Link
@@ -543,30 +673,36 @@ export function Attempts() {
                   </div>
                   <input
                     type="text"
-                    name="link"
-                    value={newAttempt.link}
+                    name="unique_link"
+                    value={newAttempt.unique_link}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
-                    placeholder="Test link will be generated automatically"
-                    readOnly
+                    placeholder="Unique link will be generated automatically"
+                    required
                   />
+                  {newAttempt.unique_link && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Test URL: {window.location.origin}/test/
+                      {newAttempt.unique_link}
+                    </div>
+                  )}
                 </div>
 
-                {/* Автоотправка */}
+                {/* Отправка email */}
                 <div className="flex items-center space-x-3 pt-4">
                   <input
                     type="checkbox"
-                    id="autosend"
-                    name="autosend"
-                    checked={newAttempt.autosend}
+                    id="send_email"
+                    name="send_email"
+                    checked={newAttempt.send_email}
                     onChange={handleInputChange}
                     className="w-5 h-5 rounded border border-zinc-300"
                   />
                   <label
-                    htmlFor="autosend"
+                    htmlFor="send_email"
                     className="text-neutral-700 text-sm font-medium"
                   >
-                    Send automatically to candidate's email
+                    Send test link to candidate's email
                   </label>
                 </div>
 
@@ -582,7 +718,12 @@ export function Attempts() {
 
                   <button
                     type="submit"
-                    className="px-6 py-2 bg-slate-500 rounded-lg text-white text-sm font-medium hover:bg-slate-600 transition-colors"
+                    className="px-6 py-2 bg-slate-500 rounded-lg text-white text-sm font-medium hover:bg-slate-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    disabled={
+                      !newAttempt.candidate ||
+                      !newAttempt.test ||
+                      !newAttempt.unique_link
+                    }
                   >
                     Create Attempt
                   </button>
