@@ -1,6 +1,7 @@
 export const API_ROUTES = {
   QUESTIONS: '/questions',
-  ATTEMPTS: '/attempts',
-  CANDIDATES: '/candidates',
   TESTS: '/tests',
+  CANDIDATES: '/candidates',
+  ATTEMPTS: '/attempts',
+  RESULTS: '/results',
 }

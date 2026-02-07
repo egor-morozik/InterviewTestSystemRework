@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { candidateService } from '../api/implementations/questionsApi'
+import { candidateService } from '../api/implementations/candidateApi'
 import { testsService } from '../api/implementations/testsApi'
 
 export function CandidateTest() {

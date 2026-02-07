@@ -49,4 +49,26 @@ export const attemptsService = {
     const response = await apiClient.get(`${ENDPOINT}/${uniqueLink}/`)
     return response.data
   },
+
+  async getCompletedAttempts(params = {}) {
+    const response = await apiClient.get(`${ENDPOINT}/completed/`, { params })
+    return response.data
+  },
+
+  async getEvaluatedAttempts(params = {}) {
+    const response = await apiClient.get(`${ENDPOINT}/evaluated/`, { params })
+    return response.data
+  },
+
+  async getAttemptsForEvaluation(params = {}) {
+    const response = await apiClient.get(`${ENDPOINT}/for-evaluation/`, {
+      params,
+    })
+    return response.data
+  },
+
+  async getAttemptAnswers(attemptId) {
+    const response = await apiClient.get(`${ENDPOINT}/${attemptId}/answers/`)
+    return response.data
+  },
 }
