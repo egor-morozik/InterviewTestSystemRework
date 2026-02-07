@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { testsService } from '../api/tests'
-import { questionsService } from '../api/questions'
+import { testsService } from '../api/implementations/testsApi'
+import { questionsService } from '../api/implementations/questionsApi'
 
 export function Tests() {
   const [searchQuery, setSearchQuery] = useState('')
