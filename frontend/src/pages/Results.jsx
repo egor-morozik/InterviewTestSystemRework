@@ -1,62 +1,60 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { resultsService } from '../api/results'
 
 export function Results() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [results, setResults] = useState([
-    {
-      id: 1,
-      candidate: 'Alex Johnson',
-      test: 'Java Middle v.1',
-      autoResult: 20,
-      manualGrade: 50,
-      status: 'evaluated',
-      dateCompleted: '2024-01-20',
-      timeSpent: '45 min',
-    },
-    {
-      id: 2,
-      candidate: 'Maria Garcia',
-      test: 'Python Backend',
-      autoResult: 100,
-      manualGrade: null,
-      status: 'completed',
-      dateCompleted: '2024-01-18',
-      timeSpent: '60 min',
-    },
-    {
-      id: 3,
-      candidate: 'David Chen',
-      test: 'DevOps',
-      autoResult: 50,
-      manualGrade: null,
-      status: 'completed',
-      dateCompleted: '2024-01-22',
-      timeSpent: '30 min',
-    },
-    {
-      id: 4,
-      candidate: 'Sarah Williams',
-      test: 'Frontend React',
-      autoResult: 85,
-      manualGrade: 90,
-      status: 'evaluated',
-      dateCompleted: '2024-01-19',
-      timeSpent: '55 min',
-    },
-  ])
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [selectedResult, setSelectedResult] = useState(null)
+  const [editingAnswer, setEditingAnswer] = useState(null)
+  const [answerScore, setAnswerScore] = useState('')
 
   const [filters, setFilters] = useState({
-    status: '',
     minScore: '',
     maxScore: '',
   })
 
   const [sortBy, setSortBy] = useState('date')
-  const [selectedResult, setSelectedResult] = useState(null)
+
+  // Загрузка результатов
+  useEffect(() => {
+    fetchResults()
+  }, [fetchResults])
+
+  const fetchResults = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const params = {}
+
+      if (searchQuery) {
+        params.search = searchQuery
+      }
+
+      // Сортировка
+      if (sortBy === 'score') {
+        params.ordering = '-manual_score_percent,-auto_score_percent'
+      } else if (sortBy === 'name') {
+        params.ordering = 'candidate__full_name'
+      } else {
+        params.ordering = '-completed_at'
+      }
+
+      const response = await resultsService.getAllResults(params)
+      setResults(Array.isArray(response) ? response : [])
+    } catch (err) {
+      setError('Failed to load results')
+      console.error('Error fetching results:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [searchQuery, sortBy])
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
-    console.log('Searching results:', searchQuery)
+    fetchResults()
   }
 
   const handleFilterChange = (e) => {
@@ -71,82 +69,168 @@ export function Results() {
     setSortBy(e.target.value)
   }
 
-  const handleDeleteResult = (id) => {
-    setResults(results.filter((result) => result.id !== id))
-  }
-
   const handleViewResult = (result) => {
     setSelectedResult(result)
-    console.log('Viewing result:', result)
   }
 
-  const handleEvaluateResult = (result) => {
-    console.log('Evaluating result:', result)
-    // Открыть модальное окно для оценки
+  const handleEvaluateAnswer = (answer) => {
+    setEditingAnswer(answer)
+    setAnswerScore(answer.manual_score || '')
+  }
+
+  const handleSaveAnswerScore = async () => {
+    if (!editingAnswer || answerScore === '') {
+      alert('Please enter a score')
+      return
+    }
+
+    const score = parseInt(answerScore)
+    if (isNaN(score) || score < 0 || score > 100) {
+      alert('Score must be a number between 0 and 100')
+      return
+    }
+
+    try {
+      setError(null)
+
+      // Обновляем оценку ответа
+      await resultsService.updateAnswerScore(
+        editingAnswer.attempt_id || selectedResult.id,
+        editingAnswer.id,
+        { manual_score: score }
+      )
+
+      // Обновляем локальное состояние
+      const updatedResults = results.map((result) => {
+        if (result.id === selectedResult.id) {
+          const updatedAnswers = result.answers.map((ans) =>
+            ans.id === editingAnswer.id ? { ...ans, manual_score: score } : ans
+          )
+
+          // Пересчитываем ручную оценку
+          const manualQuestions = updatedAnswers.filter(
+            (ans) =>
+              ans.question?.evaluation_type === 'manual' ||
+              ans.question?.evaluation_type === 'hybrid'
+          )
+          const manualCorrect = manualQuestions.filter(
+            (ans) => ans.manual_score > 0
+          ).length
+          const newManualPercent =
+            manualQuestions.length > 0
+              ? (manualCorrect / manualQuestions.length) * 100
+              : 0
+
+          return {
+            ...result,
+            answers: updatedAnswers,
+            manual_score_percent: newManualPercent,
+          }
+        }
+        return result
+      })
+
+      setResults(updatedResults)
+
+      // Обновляем selectedResult если он открыт
+      if (selectedResult) {
+        const updatedSelected = updatedResults.find(
+          (r) => r.id === selectedResult.id
+        )
+        if (updatedSelected) {
+          setSelectedResult(updatedSelected)
+        }
+      }
+
+      // Закрываем модальное окно
+      setEditingAnswer(null)
+      setAnswerScore('')
+    } catch (err) {
+      setError('Failed to save score')
+      console.error('Error saving score:', err)
+    }
   }
 
   const handleClearFilters = () => {
     setFilters({
-      status: '',
       minScore: '',
       maxScore: '',
     })
     setSortBy('date')
+    fetchResults()
   }
-
-  // Фильтрация и сортировка результатов
-  const filteredResults = results
-    .filter((result) => {
-      const matchesSearch =
-        result.candidate.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        result.test.toLowerCase().includes(searchQuery.toLowerCase())
-
-      const matchesStatus = !filters.status || result.status === filters.status
-
-      const matchesMinScore =
-        !filters.minScore ||
-        (result.manualGrade || result.autoResult) >= parseInt(filters.minScore)
-
-      const matchesMaxScore =
-        !filters.maxScore ||
-        (result.manualGrade || result.autoResult) <= parseInt(filters.maxScore)
-
-      return (
-        matchesSearch && matchesStatus && matchesMinScore && matchesMaxScore
-      )
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'score':
-          return (
-            (b.manualGrade || b.autoResult) - (a.manualGrade || a.autoResult)
-          )
-        case 'name':
-          return a.candidate.localeCompare(b.candidate)
-        case 'date':
-        default:
-          return new Date(b.dateCompleted) - new Date(a.dateCompleted)
-      }
-    })
 
   // Функция для получения цвета оценки
   const getScoreColor = (score) => {
+    if (score === null || score === undefined)
+      return 'bg-gray-100 text-gray-800 border-gray-200'
     if (score >= 80) return 'bg-green-100 text-green-800 border-green-200'
     if (score >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
     return 'bg-red-100 text-red-800 border-red-200'
   }
 
-  // Функция для получения цвета статуса
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'evaluated':
-        return 'bg-blue-100 text-blue-800'
-      case 'completed':
-        return 'bg-gray-100 text-gray-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
+  // Функция для получения статуса
+  const getStatusText = (result) => {
+    if (
+      result.manual_score_percent !== null &&
+      result.manual_score_percent !== undefined
+    ) {
+      return 'Evaluated'
     }
+    if (
+      result.auto_score_percent !== null &&
+      result.auto_score_percent !== undefined
+    ) {
+      return 'Auto-evaluated'
+    }
+    return 'Completed'
   }
+
+  // Форматирование даты
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  }
+
+  // Получаем общую оценку
+  const getOverallScore = (result) => {
+    return result.manual_score_percent !== null &&
+      result.manual_score_percent !== undefined
+      ? result.manual_score_percent
+      : result.auto_score_percent
+  }
+
+  // Фильтрация по диапазону оценок
+  const filteredResults = results.filter((result) => {
+    const overallScore = getOverallScore(result)
+    if (overallScore === undefined || overallScore === null) return true
+
+    const matchesMinScore =
+      !filters.minScore || overallScore >= parseInt(filters.minScore)
+    const matchesMaxScore =
+      !filters.maxScore || overallScore <= parseInt(filters.maxScore)
+
+    return matchesMinScore && matchesMaxScore
+  })
+
+  // Сортировка
+  const sortedResults = [...filteredResults].sort((a, b) => {
+    switch (sortBy) {
+      case 'score':
+        return getOverallScore(b) - getOverallScore(a)
+      case 'name':
+        return (a.candidate?.full_name || '').localeCompare(
+          b.candidate?.full_name || ''
+        )
+      case 'date':
+      default:
+        return new Date(b.completed_at) - new Date(a.completed_at)
+    }
+  })
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -188,9 +272,15 @@ export function Results() {
                     Search
                   </button>
                 </form>
+
+                {error && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                )}
               </div>
 
-              {/* Таблица результатов - АДАПТИВНАЯ БЕЗ ГОРИЗОНТАЛЬНОГО СКРОЛЛА */}
+              {/* Таблица результатов */}
               <div className="overflow-hidden">
                 {/* Заголовки таблицы для десктопа */}
                 <div className="hidden md:grid md:grid-cols-12 bg-gray-50 border-b border-zinc-200">
@@ -206,15 +296,15 @@ export function Results() {
                   </div>
                   <div className="col-span-2 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
-                      Result
-                    </span>
-                  </div>
-                  <div className="col-span-1 p-4">
-                    <span className="text-neutral-700 text-sm font-bold font-['Inter']">
-                      Manual Grade
+                      Auto Score
                     </span>
                   </div>
                   <div className="col-span-2 p-4">
+                    <span className="text-neutral-700 text-sm font-bold font-['Inter']">
+                      Manual Score
+                    </span>
+                  </div>
+                  <div className="col-span-1 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
                       Actions
                     </span>
@@ -223,15 +313,18 @@ export function Results() {
 
                 {/* Список результатов */}
                 <div>
-                  {filteredResults.length === 0 ? (
+                  {loading ? (
                     <div className="text-center py-8 text-gray-500 px-4">
-                      No results found.{' '}
-                      {searchQuery
-                        ? 'Try different search'
+                      Loading results...
+                    </div>
+                  ) : sortedResults.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 px-4">
+                      {searchQuery || filters.minScore || filters.maxScore
+                        ? 'No results found for your search'
                         : 'There are no test results yet'}
                     </div>
                   ) : (
-                    filteredResults.map((result, index) => (
+                    sortedResults.map((result, index) => (
                       <div
                         key={result.id}
                         className={`border-b border-zinc-200 hover:bg-gray-50 ${
@@ -244,22 +337,19 @@ export function Results() {
                             <div className="flex justify-between items-start">
                               <div className="space-y-1">
                                 <div className="text-neutral-700 text-sm font-medium">
-                                  {result.candidate}
+                                  {result.candidate?.full_name ||
+                                    'Unknown Candidate'}
                                 </div>
                                 <div className="text-neutral-500 text-sm">
-                                  {result.test}
+                                  {result.test?.title || 'Unknown Test'}
                                 </div>
                               </div>
                               <div className="flex flex-col items-end space-y-1">
-                                <span
-                                  className={`inline-block px-2 py-1 rounded text-xs font-medium ${getStatusColor(result.status)}`}
-                                >
-                                  {result.status === 'evaluated'
-                                    ? 'Evaluated'
-                                    : 'Completed'}
-                                </span>
                                 <div className="text-xs text-gray-500">
-                                  {result.dateCompleted}
+                                  {getStatusText(result)}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {formatDate(result.completed_at)}
                                 </div>
                               </div>
                             </div>
@@ -267,28 +357,28 @@ export function Results() {
                             <div className="grid grid-cols-2 gap-4 pt-2">
                               <div className="space-y-1">
                                 <div className="text-xs text-gray-500">
-                                  Auto Result
+                                  Auto Score
                                 </div>
                                 <div
-                                  className={`inline-block px-3 py-1.5 rounded-full text-sm font-bold border ${getScoreColor(result.autoResult)}`}
+                                  className={`inline-block px-3 py-1.5 rounded-full text-sm font-bold border ${getScoreColor(result.auto_score_percent)}`}
                                 >
-                                  {result.autoResult}%
+                                  {result.auto_score_percent !== null &&
+                                  result.auto_score_percent !== undefined
+                                    ? `${result.auto_score_percent}%`
+                                    : 'N/A'}
                                 </div>
                               </div>
                               <div className="space-y-1">
                                 <div className="text-xs text-gray-500">
-                                  Manual Grade
+                                  Manual Score
                                 </div>
                                 <div
-                                  className={`inline-block px-3 py-1.5 rounded-full text-sm font-bold border ${
-                                    result.manualGrade
-                                      ? getScoreColor(result.manualGrade)
-                                      : 'bg-gray-100 text-gray-800 border-gray-200'
-                                  }`}
+                                  className={`inline-block px-3 py-1.5 rounded-full text-sm font-bold border ${getScoreColor(result.manual_score_percent)}`}
                                 >
-                                  {result.manualGrade
-                                    ? `${result.manualGrade}%`
-                                    : '-'}
+                                  {result.manual_score_percent !== null &&
+                                  result.manual_score_percent !== undefined
+                                    ? `${result.manual_score_percent}%`
+                                    : 'Not graded'}
                                 </div>
                               </div>
                             </div>
@@ -300,18 +390,6 @@ export function Results() {
                               >
                                 View
                               </button>
-                              <button
-                                onClick={() => handleEvaluateResult(result)}
-                                className="px-3 py-1.5 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
-                              >
-                                Evaluate
-                              </button>
-                              <button
-                                onClick={() => handleDeleteResult(result.id)}
-                                className="px-3 py-1.5 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
-                              >
-                                Delete
-                              </button>
                             </div>
                           </div>
                         </div>
@@ -321,53 +399,50 @@ export function Results() {
                           {/* Кандидат */}
                           <div className="col-span-3 p-4">
                             <div className="text-neutral-700 text-sm font-medium">
-                              {result.candidate}
+                              {result.candidate?.full_name ||
+                                'Unknown Candidate'}
                             </div>
                             <div className="text-neutral-500 text-xs mt-1">
-                              {result.dateCompleted} • {result.timeSpent}
+                              {formatDate(result.completed_at)}
                             </div>
                           </div>
 
                           {/* Тест */}
                           <div className="col-span-4 p-4">
                             <div className="text-neutral-700 text-sm font-normal">
-                              {result.test}
+                              {result.test?.title || 'Unknown Test'}
                             </div>
-                            <div
-                              className={`inline-block px-2 py-1 rounded text-xs font-medium mt-1 ${getStatusColor(result.status)}`}
-                            >
-                              {result.status === 'evaluated'
-                                ? 'Evaluated'
-                                : 'Completed'}
+                            <div className="text-neutral-500 text-xs mt-1">
+                              {getStatusText(result)}
                             </div>
                           </div>
 
-                          {/* Результат */}
+                          {/* Автооценка */}
                           <div className="col-span-2 p-4">
                             <div
-                              className={`inline-block px-3 py-1.5 rounded-full text-sm font-bold border ${getScoreColor(result.autoResult)}`}
+                              className={`inline-block px-3 py-1.5 rounded-full text-sm font-bold border ${getScoreColor(result.auto_score_percent)}`}
                             >
-                              {result.autoResult}%
+                              {result.auto_score_percent !== null &&
+                              result.auto_score_percent !== undefined
+                                ? `${result.auto_score_percent}%`
+                                : 'N/A'}
                             </div>
                           </div>
 
                           {/* Ручная оценка */}
-                          <div className="col-span-1 p-4">
+                          <div className="col-span-2 p-4">
                             <div
-                              className={`inline-block px-3 py-1.5 rounded-full text-sm font-bold border ${
-                                result.manualGrade
-                                  ? getScoreColor(result.manualGrade)
-                                  : 'bg-gray-100 text-gray-800 border-gray-200'
-                              }`}
+                              className={`inline-block px-3 py-1.5 rounded-full text-sm font-bold border ${getScoreColor(result.manual_score_percent)}`}
                             >
-                              {result.manualGrade
-                                ? `${result.manualGrade}%`
-                                : '-'}
+                              {result.manual_score_percent !== null &&
+                              result.manual_score_percent !== undefined
+                                ? `${result.manual_score_percent}%`
+                                : 'Not graded'}
                             </div>
                           </div>
 
                           {/* Действия */}
-                          <div className="col-span-2 p-4">
+                          <div className="col-span-1 p-4">
                             <div className="flex flex-wrap gap-1">
                               <button
                                 onClick={() => handleViewResult(result)}
@@ -375,20 +450,6 @@ export function Results() {
                                 title="View Details"
                               >
                                 View
-                              </button>
-                              <button
-                                onClick={() => handleEvaluateResult(result)}
-                                className="px-2 py-1 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
-                                title="Evaluate Result"
-                              >
-                                Evaluate
-                              </button>
-                              <button
-                                onClick={() => handleDeleteResult(result.id)}
-                                className="px-2 py-1 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
-                                title="Delete Result"
-                              >
-                                Delete
                               </button>
                             </div>
                           </div>
@@ -471,27 +532,10 @@ export function Results() {
                 </header>
 
                 <div className="p-4 md:p-6 space-y-6">
-                  {/* Статус */}
-                  <div>
-                    <label className="block text-neutral-700 text-sm font-medium mb-2">
-                      Status
-                    </label>
-                    <select
-                      name="status"
-                      value={filters.status}
-                      onChange={handleFilterChange}
-                      className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
-                    >
-                      <option value="">All Statuses</option>
-                      <option value="completed">Completed</option>
-                      <option value="evaluated">Evaluated</option>
-                    </select>
-                  </div>
-
                   {/* Диапазон оценок */}
                   <div className="space-y-3">
                     <label className="block text-neutral-700 text-sm font-medium">
-                      Score Range
+                      Score Range (0-100)
                     </label>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -538,7 +582,7 @@ export function Results() {
         {/* Модальное окно деталей результата */}
         {selectedResult && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xl font-bold text-neutral-700">
@@ -552,67 +596,233 @@ export function Results() {
                   </button>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-sm text-gray-500">Candidate</div>
-                      <div className="font-medium">
-                        {selectedResult.candidate}
+                <div className="space-y-6">
+                  {/* Основная информация */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-sm text-gray-500">Candidate</div>
+                        <div className="font-medium">
+                          {selectedResult.candidate?.full_name || 'Unknown'}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {selectedResult.candidate?.email || ''}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">Position</div>
+                        <div className="font-medium">
+                          {selectedResult.candidate?.position ||
+                            'Not specified'}
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Test</div>
-                      <div className="font-medium">{selectedResult.test}</div>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-sm text-gray-500">Test</div>
+                        <div className="font-medium">
+                          {selectedResult.test?.title || 'Unknown'}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {selectedResult.test?.description || ''}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">Completed</div>
+                        <div className="font-medium">
+                          {formatDate(selectedResult.completed_at)}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-sm text-gray-500">
-                        Date Completed
+                  {/* Оценки */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="text-center p-4 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-500 mb-2">
+                        Auto Score
                       </div>
-                      <div>{selectedResult.dateCompleted}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Time Spent</div>
-                      <div>{selectedResult.timeSpent}</div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-sm text-gray-500">Auto Result</div>
                       <div
-                        className={`inline-block px-3 py-1.5 rounded-full font-bold ${getScoreColor(selectedResult.autoResult)}`}
+                        className={`text-2xl font-bold ${getScoreColor(selectedResult.auto_score_percent).split(' ')[1]}`}
                       >
-                        {selectedResult.autoResult}%
+                        {selectedResult.auto_score_percent !== null &&
+                        selectedResult.auto_score_percent !== undefined
+                          ? `${selectedResult.auto_score_percent}%`
+                          : 'N/A'}
                       </div>
                     </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Manual Grade</div>
+                    <div className="text-center p-4 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-500 mb-2">
+                        Manual Score
+                      </div>
                       <div
-                        className={`inline-block px-3 py-1.5 rounded-full font-bold ${
-                          selectedResult.manualGrade
-                            ? getScoreColor(selectedResult.manualGrade)
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
+                        className={`text-2xl font-bold ${getScoreColor(selectedResult.manual_score_percent).split(' ')[1]}`}
                       >
-                        {selectedResult.manualGrade
-                          ? `${selectedResult.manualGrade}%`
+                        {selectedResult.manual_score_percent !== null &&
+                        selectedResult.manual_score_percent !== undefined
+                          ? `${selectedResult.manual_score_percent}%`
                           : 'Not graded'}
                       </div>
                     </div>
                   </div>
 
+                  {/* Ответы */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-semibold text-gray-800">
+                      Questions & Answers
+                    </h4>
+                    {selectedResult.answers &&
+                    selectedResult.answers.length > 0 ? (
+                      <div className="space-y-4">
+                        {selectedResult.answers.map((answer) => (
+                          <div
+                            key={answer.id}
+                            className="border border-gray-200 rounded-lg p-4"
+                          >
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-800 mb-2">
+                                  {answer.question_text || 'Question'}
+                                </div>
+                                <div className="text-sm text-gray-600 mb-3">
+                                  <strong>Answer:</strong>{' '}
+                                  {answer.response || 'No answer'}
+                                </div>
+                              </div>
+                              <div className="ml-4 text-right">
+                                <div className="text-sm text-gray-500 mb-1">
+                                  Auto Score
+                                </div>
+                                <div className="font-medium">
+                                  {answer.auto_score !== null &&
+                                  answer.auto_score !== undefined
+                                    ? `${answer.auto_score}`
+                                    : 'N/A'}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-4">
+                                <div>
+                                  <div className="text-sm text-gray-500 mb-1">
+                                    Manual Score
+                                  </div>
+                                  <div className="font-medium">
+                                    {answer.manual_score !== null &&
+                                    answer.manual_score !== undefined
+                                      ? `${answer.manual_score}`
+                                      : 'Not graded'}
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleEvaluateAnswer(answer)}
+                                className="px-4 py-2 bg-purple-800 rounded text-white text-sm hover:bg-purple-900 transition-colors"
+                              >
+                                Grade
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        No answers found for this test
+                      </div>
+                    )}
+                  </div>
+
                   <div className="pt-4 border-t">
                     <button
-                      onClick={() => {
-                        handleEvaluateResult(selectedResult)
-                        setSelectedResult(null)
-                      }}
-                      className="w-full py-2 bg-purple-800 rounded text-white hover:bg-purple-900 transition-colors"
+                      onClick={() => setSelectedResult(null)}
+                      className="w-full py-2 bg-gray-200 rounded text-gray-700 hover:bg-gray-300 transition-colors"
                     >
-                      Evaluate Result
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Модальное окно для оценки ответа */}
+        {editingAnswer && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-neutral-700">
+                    Grade Answer
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setEditingAnswer(null)
+                      setAnswerScore('')
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="text-sm text-gray-600 mb-2">
+                    {editingAnswer.question_text || 'Question'}
+                  </div>
+
+                  <div className="bg-gray-50 p-3 rounded-lg mb-4">
+                    <div className="text-sm text-gray-500 mb-1">
+                      Candidate's Answer:
+                    </div>
+                    <div className="text-gray-800">
+                      {editingAnswer.response || 'No answer'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-sm text-gray-500 mb-1">
+                      Current Auto Score
+                    </div>
+                    <div className="font-medium mb-4">
+                      {editingAnswer.auto_score !== null &&
+                      editingAnswer.auto_score !== undefined
+                        ? `${editingAnswer.auto_score}`
+                        : 'N/A'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">
+                      Manual Score (0-100)
+                    </label>
+                    <input
+                      type="number"
+                      value={answerScore}
+                      onChange={(e) => setAnswerScore(e.target.value)}
+                      min="0"
+                      max="100"
+                      className="w-full px-4 py-2 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
+                      placeholder="Enter manual score"
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      onClick={() => {
+                        setEditingAnswer(null)
+                        setAnswerScore('')
+                      }}
+                      className="flex-1 py-2 bg-gray-200 rounded text-gray-700 hover:bg-gray-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveAnswerScore}
+                      className="flex-1 py-2 bg-purple-800 rounded text-white hover:bg-purple-900 transition-colors"
+                    >
+                      Save Score
                     </button>
                   </div>
                 </div>

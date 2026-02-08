@@ -14,31 +14,11 @@ export const resultsService = {
     return response.data
   },
 
-  async getResultDetails(id) {
-    const response = await apiClient.get(`${ENDPOINT}/${id}/details/`)
-    return response.data
-  },
-
-  async evaluateResult(id, data) {
-    const response = await apiClient.post(`${ENDPOINT}/${id}/evaluate/`, data)
-    return response.data
-  },
-
-  async deleteResult(id) {
-    const response = await apiClient.delete(`${ENDPOINT}/${id}/`)
-    return response.data
-  },
-
-  async getResultsStats() {
-    const response = await apiClient.get(`${ENDPOINT}/stats/`)
-    return response.data
-  },
-
-  async exportResults(params = {}) {
-    const response = await apiClient.get(`${ENDPOINT}/export/`, {
-      params,
-      responseType: 'blob',
-    })
+  async updateAnswerScore(attemptId, answerId, data) {
+    const response = await apiClient.patch(
+      `${ENDPOINT}/${attemptId}/answer/${answerId}/score/`,
+      data
+    )
     return response.data
   },
 }
