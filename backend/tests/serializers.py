@@ -76,3 +76,17 @@ class TestSerializer(serializers.ModelSerializer):
                 )
 
         return instance
+
+
+class TestResultsSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для теста в результатах.
+    """
+
+    class Meta:
+        model = Test
+        fields = [
+            "title",
+            "description",
+            "time_limit",
+        ]

@@ -1,4 +1,5 @@
-from rest_framework import status, viewsets
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -10,6 +11,7 @@ from .serializers import (
     AdminAttemptSerializer,
     AnswerSerializer,
     CandidateAttemptSerializer,
+    ResultsSerializer,
 )
 
 
@@ -79,3 +81,57 @@ class CandidateAttemptViewSet(viewsets.GenericViewSet):
         evaluate_answer.delay(attempt.id)
 
         return Response({"status": "Тест успешно завершен"})
+
+
+class ResultsViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Представление для отображения результатов прохождения тестов.
+    """
+
+    queryset = (
+        Attempt.objects.filter(completed=True)
+        .select_related("candidate", "test")
+        .prefetch_related("answers__question")
+        .order_by("-completed_at")
+    )
+
+    serializer_class = ResultsSerializer
+
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+
+    filterset_fields = [
+        "candidate__position",
+        "test__title",
+    ]
+
+    search_fields = [
+        "candidate__full_name",
+        "candidate__email",
+        "test__title",
+    ]
+
+    ordering_fields = [
+        "completed_at",
+        "auto_score_percent",
+        "manual_score_percent",
+    ]
+
+    ordering = ["-completed_at"]
+
+    @action(detail=True, methods=["patch"], url_path="answer/(?P<answer_id>[^/.]+)/score")
+    def update_answer_score(self, request, pk=None, answer_id=None):
+        attempt = self.get_object()
+        answer = attempt.answers.get(id=answer_id)
+
+        manual_score = request.data.get("manual_score")
+        if manual_score is not None:
+            manual_score = int(manual_score)
+            answer.manual_score = manual_score
+            answer.save()
+            attempt.calculate_percents()
+            attempt.save()
+            return Response({"message": "Updated successfully"}, status=status.HTTP_200_OK)

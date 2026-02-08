@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import AdminAttemptViewSet, CandidateAttemptViewSet
+from .views import AdminAttemptViewSet, CandidateAttemptViewSet, ResultsViewSet
 
 router = DefaultRouter()
 
@@ -15,6 +15,12 @@ router.register(
     r"candidate_attempts",
     CandidateAttemptViewSet,
     basename="candidate_attempt",
+)
+
+router.register(
+    r"results",
+    ResultsViewSet,
+    basename="result",
 )
 
 urlpatterns = [

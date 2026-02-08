@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
+from candidates.serializers import CandidateSerializer
 from questions.serializers import QuestionSerializer
+from tests.serializers import TestResultsSerializer
 
 from .models import ActivityLog, Answer, Attempt
 
@@ -31,6 +33,7 @@ class AnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Answer
         fields = [
+            "id",
             "question",
             "question_text",
             "response",
@@ -122,3 +125,35 @@ class CandidateAttemptSerializer(serializers.ModelSerializer):
             data["questions"] = []
             data["message"] = "Тест уже завершен."
         return data
+
+
+class ResultsSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для результатов тестирования.
+    """
+
+    candidate = CandidateSerializer(
+        read_only=True,
+    )
+
+    test = TestResultsSerializer(
+        read_only=True,
+    )
+
+    answers = AnswerSerializer(
+        many=True,
+        read_only=True,
+    )
+
+    class Meta:
+        model = Attempt
+        fields = [
+            "id",
+            "candidate",
+            "test",
+            "auto_score_percent",
+            "manual_score_percent",
+            "last_send",
+            "completed_at",
+            "answers",
+        ]
