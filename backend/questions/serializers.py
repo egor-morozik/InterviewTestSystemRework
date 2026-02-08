@@ -62,6 +62,7 @@ class QuestionSerializer(serializers.ModelSerializer):
             "extra_data",
             "tags",
             "choices",
+            "evaluation_type",
         ]
 
     def create(self, validated_data):

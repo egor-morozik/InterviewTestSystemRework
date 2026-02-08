@@ -18,6 +18,11 @@ class Question(models.Model):
         MEDIUM = "medium", "средний"
         HARD = "hard", "сложный"
 
+    class QuestionEvalTypes(models.TextChoices):
+        AUTO = "auto", "Только авто"
+        MANUAL = "manual", "Только ручная"
+        HYBRID = "hybrid", "Гибрид"
+
     title = models.CharField(
         "Название вопроса",
         max_length=100,
@@ -42,6 +47,8 @@ class Question(models.Model):
         default=QuestionComplexity.EASY,
     )
 
+    evaluation_type = models.CharField(max_length=10, choices=QuestionEvalTypes.choices, default=QuestionEvalTypes.AUTO)
+
     extra_data = models.JSONField(
         "Дополнительные параметры вопроса",
         default=dict,
@@ -62,11 +69,6 @@ class Question(models.Model):
         null=True,
     )
 
-    is_manual_verification_only = models.BooleanField(
-        "Только ручная оценка",
-        default=False,
-    )
-
     @property
     def get_expected_answer(self):
         all_choices = self.choices.all()
@@ -83,20 +85,11 @@ class Question(models.Model):
         verbose_name = "Вопрос"
         verbose_name_plural = "Вопросы"
         ordering = ["-id"]
-        constraints = [
-            models.CheckConstraint(
-                condition=(
-                    models.Q(is_manual_verification_only=True)
-                    | ~models.Q(question_type="text", expected_answer__isnull=True)
-                ),
-                name="text_question_integrity",
-            )
-        ]
 
     def clean(self):
         if (
             self.question_type == self.QuestionType.TEXT
-            and not self.is_manual_verification_only
+            and not self.evaluation_type == self.QuestionEvalTypes.MANUAL
             and not self.expected_answer
         ):
             raise ValidationError("Укажите правильный ответ или выставите ручную оценку.")

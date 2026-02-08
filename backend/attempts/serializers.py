@@ -23,7 +23,10 @@ class AnswerSerializer(serializers.ModelSerializer):
     Сериализатор данных ответа кандидата.
     """
 
-    question_text = serializers.CharField(source="question.text", read_only=True)
+    question_text = serializers.CharField(
+        source="question.text",
+        read_only=True,
+    )
 
     class Meta:
         model = Answer
@@ -31,7 +34,8 @@ class AnswerSerializer(serializers.ModelSerializer):
             "question",
             "question_text",
             "response",
-            "score",
+            "auto_score",
+            "manual_score",
         ]
 
 
@@ -79,6 +83,8 @@ class AdminAttemptSerializer(serializers.ModelSerializer):
             "activity",
             "answers",
             "last_send",
+            "manual_score_percent",
+            "auto_score_percent",
         ]
         read_only_fields = [
             "unique_link",
