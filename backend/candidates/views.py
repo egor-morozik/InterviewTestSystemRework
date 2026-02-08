@@ -11,7 +11,7 @@ class CandidateViewSet(viewsets.ModelViewSet):
     Представление данных кандидата в системе.
     """
 
-    queryset = Candidate
+    queryset = Candidate.objects.all() 
     serializer_class = CandidateSerializer
 
     filter_backends = [

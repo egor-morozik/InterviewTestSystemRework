@@ -5,7 +5,7 @@ from .views import QuestionViewSet
 
 router = DefaultRouter()
 
-router.register(r"questions/", QuestionViewSet, basename="question")
+router.register(r"questions", QuestionViewSet, basename="question")
 
 urlpatterns = [
     path(

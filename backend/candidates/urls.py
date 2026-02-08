@@ -5,7 +5,7 @@ from .views import CandidateViewSet
 
 router = DefaultRouter()
 
-router.register(r"candidates/", CandidateViewSet, basename="candidate")
+router.register(r"candidates", CandidateViewSet, basename="candidate")
 
 urlpatterns = [
     path(
