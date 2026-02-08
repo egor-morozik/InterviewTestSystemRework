@@ -17,11 +17,6 @@ export function Results() {
 
   const [sortBy, setSortBy] = useState('date')
 
-  // Загрузка результатов
-  useEffect(() => {
-    fetchResults()
-  }, [fetchResults])
-
   const fetchResults = useCallback(async () => {
     try {
       setLoading(true)
@@ -52,6 +47,11 @@ export function Results() {
     }
   }, [searchQuery, sortBy])
 
+  // Загрузка результатов
+  useEffect(() => {
+    fetchResults()
+  }, [fetchResults])
+
   const handleSearchSubmit = (e) => {
     e.preventDefault()
     fetchResults()
@@ -75,7 +75,11 @@ export function Results() {
 
   const handleEvaluateAnswer = (answer) => {
     setEditingAnswer(answer)
-    setAnswerScore(answer.manual_score || '')
+    setAnswerScore(
+      answer.manual_score || answer.manual_score === 0
+        ? answer.manual_score.toString()
+        : ''
+    )
   }
 
   const handleSaveAnswerScore = async () => {
@@ -95,7 +99,7 @@ export function Results() {
 
       // Обновляем оценку ответа
       await resultsService.updateAnswerScore(
-        editingAnswer.attempt_id || selectedResult.id,
+        selectedResult.id,
         editingAnswer.id,
         { manual_score: score }
       )
@@ -103,9 +107,12 @@ export function Results() {
       // Обновляем локальное состояние
       const updatedResults = results.map((result) => {
         if (result.id === selectedResult.id) {
-          const updatedAnswers = result.answers.map((ans) =>
-            ans.id === editingAnswer.id ? { ...ans, manual_score: score } : ans
-          )
+          const updatedAnswers =
+            result.answers?.map((ans) =>
+              ans.id === editingAnswer.id
+                ? { ...ans, manual_score: score }
+                : ans
+            ) || []
 
           // Пересчитываем ручную оценку
           const manualQuestions = updatedAnswers.filter(
@@ -164,8 +171,11 @@ export function Results() {
   const getScoreColor = (score) => {
     if (score === null || score === undefined)
       return 'bg-gray-100 text-gray-800 border-gray-200'
-    if (score >= 80) return 'bg-green-100 text-green-800 border-green-200'
-    if (score >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+    const numericScore = parseFloat(score)
+    if (numericScore >= 80)
+      return 'bg-green-100 text-green-800 border-green-200'
+    if (numericScore >= 60)
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200'
     return 'bg-red-100 text-red-800 border-red-200'
   }
 
@@ -189,46 +199,60 @@ export function Results() {
   // Форматирование даты
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
+    {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    }
   }
 
   // Получаем общую оценку
   const getOverallScore = (result) => {
-    return result.manual_score_percent !== null &&
+    if (
+      result.manual_score_percent !== null &&
       result.manual_score_percent !== undefined
-      ? result.manual_score_percent
-      : result.auto_score_percent
+    ) {
+      return parseFloat(result.manual_score_percent)
+    }
+    if (
+      result.auto_score_percent !== null &&
+      result.auto_score_percent !== undefined
+    ) {
+      return parseFloat(result.auto_score_percent)
+    }
+    return null
   }
 
   // Фильтрация по диапазону оценок
   const filteredResults = results.filter((result) => {
     const overallScore = getOverallScore(result)
-    if (overallScore === undefined || overallScore === null) return true
+    if (overallScore === null) return true
 
     const matchesMinScore =
-      !filters.minScore || overallScore >= parseInt(filters.minScore)
+      !filters.minScore || overallScore >= parseFloat(filters.minScore)
     const matchesMaxScore =
-      !filters.maxScore || overallScore <= parseInt(filters.maxScore)
+      !filters.maxScore || overallScore <= parseFloat(filters.maxScore)
 
     return matchesMinScore && matchesMaxScore
   })
 
   // Сортировка
   const sortedResults = [...filteredResults].sort((a, b) => {
+    const scoreA = getOverallScore(a) || 0
+    const scoreB = getOverallScore(b) || 0
+
     switch (sortBy) {
       case 'score':
-        return getOverallScore(b) - getOverallScore(a)
+        return scoreB - scoreA
       case 'name':
         return (a.candidate?.full_name || '').localeCompare(
           b.candidate?.full_name || ''
         )
       case 'date':
       default:
-        return new Date(b.completed_at) - new Date(a.completed_at)
+        return new Date(b.completed_at || 0) - new Date(a.completed_at || 0)
     }
   })
 
@@ -364,7 +388,7 @@ export function Results() {
                                 >
                                   {result.auto_score_percent !== null &&
                                   result.auto_score_percent !== undefined
-                                    ? `${result.auto_score_percent}%`
+                                    ? `${parseFloat(result.auto_score_percent).toFixed(1)}%`
                                     : 'N/A'}
                                 </div>
                               </div>
@@ -377,7 +401,7 @@ export function Results() {
                                 >
                                   {result.manual_score_percent !== null &&
                                   result.manual_score_percent !== undefined
-                                    ? `${result.manual_score_percent}%`
+                                    ? `${parseFloat(result.manual_score_percent).toFixed(1)}%`
                                     : 'Not graded'}
                                 </div>
                               </div>
@@ -424,7 +448,7 @@ export function Results() {
                             >
                               {result.auto_score_percent !== null &&
                               result.auto_score_percent !== undefined
-                                ? `${result.auto_score_percent}%`
+                                ? `${parseFloat(result.auto_score_percent).toFixed(1)}%`
                                 : 'N/A'}
                             </div>
                           </div>
@@ -436,7 +460,7 @@ export function Results() {
                             >
                               {result.manual_score_percent !== null &&
                               result.manual_score_percent !== undefined
-                                ? `${result.manual_score_percent}%`
+                                ? `${parseFloat(result.manual_score_percent).toFixed(1)}%`
                                 : 'Not graded'}
                             </div>
                           </div>
@@ -647,7 +671,7 @@ export function Results() {
                       >
                         {selectedResult.auto_score_percent !== null &&
                         selectedResult.auto_score_percent !== undefined
-                          ? `${selectedResult.auto_score_percent}%`
+                          ? `${parseFloat(selectedResult.auto_score_percent).toFixed(1)}%`
                           : 'N/A'}
                       </div>
                     </div>
@@ -660,7 +684,7 @@ export function Results() {
                       >
                         {selectedResult.manual_score_percent !== null &&
                         selectedResult.manual_score_percent !== undefined
-                          ? `${selectedResult.manual_score_percent}%`
+                          ? `${parseFloat(selectedResult.manual_score_percent).toFixed(1)}%`
                           : 'Not graded'}
                       </div>
                     </div>
