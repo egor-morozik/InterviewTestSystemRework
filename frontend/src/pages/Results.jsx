@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { resultsService } from '../api/implementations/results'
+import { resultsService } from '../api/implementations/resultsApi'
 
 export function Results() {
   const [searchQuery, setSearchQuery] = useState('')
