@@ -28,22 +28,22 @@ def evaluate_answer(attempt_id):
             match question.question_type:
                 case question.QuestionType.TEXT:
                     if str(candidate_reply) == str(expected):
-                        answer.score = 1
+                        answer.auto_score = 1
 
                 case question.QuestionType.SINGLE_CHOICE:
                     if str(candidate_reply) == str(expected):
-                        answer.score = 1
+                        answer.auto_score = 1
 
                 case question.QuestionType.MULTIPLE_CHOICE:
                     candidate_list = sorted(json.loads(candidate_reply))
                     if candidate_list == expected:
-                        answer.score = 1
+                        answer.auto_score = 1
 
                 case _:
                     continue
 
             answer.save(
                 update_fields=[
-                    "score",
+                    "auto_score",
                 ],
             )
