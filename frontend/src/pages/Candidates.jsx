@@ -17,7 +17,6 @@ export function Candidates() {
     email: '',
     position: '',
     status: 'pending',
-    notes: '',
   })
 
   // Загрузка кандидатов
@@ -106,7 +105,6 @@ export function Candidates() {
         email: '',
         position: '',
         status: 'pending',
-        notes: '',
       })
 
       console.log('Added candidate:', response)
@@ -146,7 +144,6 @@ Email: ${candidate.email}
 Position: ${candidate.position}
 Status: ${candidate.status}
 Created: ${new Date(candidate.created_at).toLocaleDateString()}
-Notes: ${candidate.notes || 'No notes'}
     `
     alert(details)
   }
@@ -165,7 +162,6 @@ Notes: ${candidate.notes || 'No notes'}
       email: '',
       position: '',
       status: 'pending',
-      notes: '',
     })
   }
 
@@ -523,21 +519,6 @@ Notes: ${candidate.notes || 'No notes'}
                       <option value="completed">Completed</option>
                     </select>
                   </div>
-                </div>
-
-                {/* Комментарий */}
-                <div>
-                  <label className="block text-neutral-700 text-sm font-medium mb-2">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    name="notes"
-                    value={newCandidate.notes}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm resize-none"
-                    placeholder="Add any notes about this candidate..."
-                    rows={3}
-                  />
                 </div>
 
                 {/* Кнопки */}
