@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { testsService } from '../api/implementations/testsApi'
-import { candidateService } from '../api/implementations/candidateApi'
+import { attemptsService } from '../api/implementations/attemptsApi'
 
 export function CandidateTest() {
-  const { testId } = useParams() // Получаем ID теста из URL
+  const { uniqueLink } = useParams() // Получаем уникальную ссылку из URL
   const navigate = useNavigate()
 
   const [timeLeft, setTimeLeft] = useState(0)
@@ -16,14 +15,14 @@ export function CandidateTest() {
   const [error, setError] = useState(null)
 
   // Данные теста и вопросов
-  const [testData, setTestData] = useState(null)
+  const [attemptData, setAttemptData] = useState(null)
   const [questions, setQuestions] = useState([])
 
-  // Загрузка теста и вопросов
+  // Загрузка теста по уникальной ссылке
   useEffect(() => {
-    const fetchTestData = async () => {
-      if (!testId) {
-        setError('Test ID is required')
+    const fetchAttemptData = async () => {
+      if (!uniqueLink) {
+        setError('Unique link is required')
         setLoading(false)
         return
       }
@@ -32,14 +31,22 @@ export function CandidateTest() {
         setLoading(true)
         setError(null)
 
-        // Загружаем данные теста
-        const testResponse = await testsService.getTest(testId)
-        setTestData(testResponse)
+        // Загружаем данные попытки по уникальной ссылке
+        const response =
+          await attemptsService.getAttemptByUniqueLink(uniqueLink)
+
+        // Проверяем, не завершен ли уже тест
+        if (response.completed) {
+          setError('This test has already been completed')
+          setLoading(false)
+          return
+        }
+
+        setAttemptData(response)
 
         // Извлекаем вопросы из теста
-        const testQuestions = testResponse.test_questions || []
-        const formattedQuestions = testQuestions.map((tq, index) => {
-          const question = tq.question
+        const testQuestions = response.questions || []
+        const formattedQuestions = testQuestions.map((question, index) => {
           return {
             id: question.id,
             type: question.question_type,
@@ -47,7 +54,7 @@ export function CandidateTest() {
               question.question_type === 'hr'
                 ? 'HR Questions'
                 : 'Tech Questions',
-            question: question.title || question.text || '',
+            question: question.text || question.title || '',
             questionType:
               question.question_type === 'multiple'
                 ? 'multiple'
@@ -56,25 +63,25 @@ export function CandidateTest() {
                   : 'text',
             maxLength: 1000,
             options: question.choices?.map((choice) => choice.text) || [],
-            order: index + 1, // <-- используем index
+            order: index + 1,
           }
         })
 
         setQuestions(formattedQuestions)
 
         // Устанавливаем таймер на основе time_limit теста
-        const timeLimit = testResponse.time_limit || 300 // 5 минут по умолчанию
+        const timeLimit = response.time_limit || 300 // 5 минут по умолчанию
         setTimeLeft(timeLimit * 60) // конвертируем минуты в секунды
       } catch (err) {
         setError('Failed to load test')
-        console.error('Error fetching test:', err)
+        console.error('Error fetching attempt:', err)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchTestData()
-  }, [testId])
+    fetchAttemptData()
+  }, [uniqueLink])
 
   // Таймер
   useEffect(() => {
@@ -144,61 +151,87 @@ export function CandidateTest() {
   }
 
   const handleTestSubmit = useCallback(async () => {
-    if (testCompleted) return
+    if (testCompleted || !uniqueLink) return
 
     try {
       setIsTimerRunning(false)
       setTestCompleted(true)
 
       // Форматируем ответы для отправки
-      const formattedAnswers = Object.entries(answers).map(
-        ([questionId, answer]) => {
-          const question = questions.find((q) => q.id === parseInt(questionId))
+      const formattedAnswers = questions.map((question) => {
+        const answer = answers[question.id]
 
-          let answerValue = answer
+        let responseValue = ''
 
-          // Для множественного выбора конвертируем индексы в текст
-          if (question?.questionType === 'multiple' && Array.isArray(answer)) {
-            answerValue = answer.map((idx) => question.options[idx]).join('; ')
-          }
-          // Для одиночного выбора конвертируем индекс в текст
-          else if (
-            question?.questionType === 'single' &&
-            typeof answer === 'number'
-          ) {
-            answerValue = question.options[answer]
-          }
-
-          return {
-            question: parseInt(questionId),
-            answer: answerValue,
-          }
+        if (question.questionType === 'multiple' && Array.isArray(answer)) {
+          responseValue = answer.map((idx) => question.options[idx]).join('; ')
+        } else if (
+          question.questionType === 'single' &&
+          typeof answer === 'number'
+        ) {
+          responseValue = question.options[answer]
+        } else if (typeof answer === 'string') {
+          responseValue = answer
         }
-      )
 
-      // Данные кандидата (в реальном приложении нужно получать из формы входа)
-      const candidateData = {
-        test: testId,
-        full_name: 'Кандидат', // Заменить на реальные данные
-        email: 'candidate@example.com', // Заменить на реальные данные
-        answers: formattedAnswers,
-        time_spent: testData?.time_limit * 60 - timeLeft, // потраченное время в секундах
-        status: 'completed',
-      }
+        return {
+          question: question.id,
+          response: responseValue,
+        }
+      })
 
       // Отправляем результаты теста
-      await candidateService.createCandidate(candidateData)
+      await attemptsService.submitAttempt(uniqueLink, {
+        answers: formattedAnswers,
+      })
 
-      console.log('Test submitted:', answers)
+      console.log('Test submitted successfully')
     } catch (err) {
-      setError('Failed to submit test')
       console.error('Error submitting test:', err)
-      // Показываем ошибку, но оставляем тест завершенным
       alert(
         'Произошла ошибка при отправке результатов. Пожалуйста, свяжитесь с администратором.'
       )
     }
-  }, [answers, testCompleted, questions, testId, testData, timeLeft])
+  }, [answers, testCompleted, questions, uniqueLink])
+
+  // Логирование активности
+  const logActivity = useCallback(
+    async (eventType) => {
+      if (!uniqueLink) return
+
+      try {
+        await attemptsService.logActivity(uniqueLink, {
+          event_type: eventType,
+        })
+      } catch (err) {
+        console.error('Error logging activity:', err)
+      }
+    },
+    [uniqueLink]
+  )
+
+  // Логирование переключения вкладок
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        logActivity('hidden')
+      } else {
+        logActivity('visible')
+      }
+    }
+
+    const handleCopy = () => {
+      logActivity('copytext')
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    document.addEventListener('copy', handleCopy)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      document.removeEventListener('copy', handleCopy)
+    }
+  }, [logActivity])
 
   // Показываем загрузку
   if (loading) {
@@ -270,7 +303,7 @@ export function CandidateTest() {
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600">Потраченное время:</p>
             <p className="font-mono">
-              {formatTime(testData?.time_limit * 60 - timeLeft)}
+              {formatTime(attemptData?.time_limit * 60 - timeLeft)}
             </p>
           </div>
           <button
@@ -292,11 +325,9 @@ export function CandidateTest() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                {testData?.title || 'Тест для кандидата'}
+                Тест для кандидата
               </h1>
-              <p className="text-gray-600">
-                {testData?.description || 'Вопросы от HR и TechLead'}
-              </p>
+              <p className="text-gray-600">Вопросы от HR и TechLead</p>
             </div>
 
             <div
@@ -338,7 +369,7 @@ export function CandidateTest() {
                     {currentQuestion.category}
                   </span>
                   <div className="text-sm text-gray-500">
-                    Вопрос {currentQuestion.id}
+                    Вопрос {currentQuestion.order}
                   </div>
                 </div>
               </div>
