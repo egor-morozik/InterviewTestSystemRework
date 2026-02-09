@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { questionsService } from '../api/implementations/questionsApi'
 
 export function Questions() {
@@ -11,6 +11,7 @@ export function Questions() {
     title: '',
     question_type: '',
     question_complexity: '',
+    evaluation_type: 'auto',
     tags: '',
     answer: '',
     tags_titles: [],
@@ -20,26 +21,27 @@ export function Questions() {
   const [filters, setFilters] = useState({
     question_type: '',
     question_complexity: '',
+    evaluation_type: '',
   })
 
-  const fetchQuestions = async () => {
+  // Обернем fetchQuestions в useCallback
+  const fetchQuestions = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Собираем параметры для API
       const params = {}
-
       if (searchQuery) {
         params.search = searchQuery
       }
-
       if (filters.question_type) {
         params.question_type = filters.question_type
       }
-
       if (filters.question_complexity) {
         params.question_complexity = filters.question_complexity
+      }
+      if (filters.evaluation_type) {
+        params.evaluation_type = filters.evaluation_type
       }
 
       const response = await questionsService.getAllQuestions(params)
@@ -50,44 +52,20 @@ export function Questions() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [
+    searchQuery,
+    filters.question_type,
+    filters.question_complexity,
+    filters.evaluation_type,
+  ])
 
   useEffect(() => {
-    const loadQuestions = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        const params = {}
-
-        if (searchQuery) {
-          params.search = searchQuery
-        }
-
-        if (filters.question_type) {
-          params.question_type = filters.question_type
-        }
-
-        if (filters.question_complexity) {
-          params.question_complexity = filters.question_complexity
-        }
-
-        const response = await questionsService.getAllQuestions(params)
-        setQuestions(response)
-      } catch (err) {
-        setError('Failed to load questions')
-        console.error('Error fetching questions:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadQuestions()
-  }, [searchQuery, filters.question_type, filters.question_complexity])
+    fetchQuestions()
+  }, [fetchQuestions]) // Теперь зависимость корректная
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
-    fetchQuestions() // Выполняем поиск с текущими параметрами
+    fetchQuestions()
   }
 
   const handleAddQuestion = async (e) => {
@@ -96,7 +74,6 @@ export function Questions() {
     try {
       setError(null)
 
-      // Преобразуем теги из строки в массив
       const tagsArray = newQuestion.tags
         .split('\n')
         .map((tag) => tag.trim())
@@ -105,10 +82,10 @@ export function Questions() {
       const questionData = {
         ...newQuestion,
         tags_titles: tagsArray,
+        evaluation_type: newQuestion.evaluation_type || 'auto',
       }
 
       if (editingQuestion) {
-        // Обновление существующего вопроса
         const response = await questionsService.updateQuestion(
           editingQuestion.id,
           questionData
@@ -117,15 +94,12 @@ export function Questions() {
           questions.map((q) => (q.id === editingQuestion.id ? response : q))
         )
       } else {
-        // Создание нового вопроса
         const response = await questionsService.createQuestion(questionData)
         setQuestions([...questions, response])
       }
 
       handleClearForm()
       setEditingQuestion(null)
-
-      // Обновляем список вопросов
       await fetchQuestions()
     } catch (err) {
       setError('Failed to save question')
@@ -171,6 +145,7 @@ export function Questions() {
       title: question.title || '',
       question_type: question.question_type || '',
       question_complexity: question.question_complexity || '',
+      evaluation_type: question.evaluation_type || 'auto',
       tags: Array.isArray(question.tags)
         ? question.tags.map((t) => t.title).join('\n')
         : question.tags_titles?.join('\n') || '',
@@ -181,12 +156,11 @@ export function Questions() {
 
   const handleViewDetails = (question) => {
     alert(
-      `Details:\nTitle: ${question.title}\nType: ${question.question_type}\nDifficulty: ${question.question_complexity}\nTags: ${Array.isArray(question.tags) ? question.tags.map((t) => t.title).join(', ') : question.tags_titles?.join(', ')}`
+      `Details:\nTitle: ${question.title}\nType: ${question.question_type}\nDifficulty: ${question.question_complexity}\nEvaluation: ${question.evaluation_type}\nTags: ${Array.isArray(question.tags) ? question.tags.map((t) => t.title).join(', ') : question.tags_titles?.join(', ')}`
     )
   }
 
   const handleImportQuestions = () => {
-    // TODO: Реализовать импорт вопросов
     alert('Import functionality not implemented yet')
   }
 
@@ -195,6 +169,7 @@ export function Questions() {
       title: '',
       question_type: '',
       question_complexity: '',
+      evaluation_type: 'auto',
       tags: '',
       answer: '',
       tags_titles: [],
@@ -210,10 +185,9 @@ export function Questions() {
     setFilters({
       question_type: '',
       question_complexity: '',
+      evaluation_type: '',
     })
     setSearchQuery('')
-    // После очистки фильтров нужно обновить данные
-    setTimeout(() => fetchQuestions(), 0)
   }
 
   const getTypeDisplay = (type) => {
@@ -222,6 +196,10 @@ export function Questions() {
       multiple: 'Multiple Choice',
       single: 'Single Choice',
       coding: 'Coding Challenge',
+      text: 'Text',
+      single_choice: 'Single Choice',
+      multiple_choice: 'Multiple Choice',
+      code: 'Code',
     }
     return typeMap[type] || type
   }
@@ -235,6 +213,15 @@ export function Questions() {
     return complexityMap[complexity] || complexity
   }
 
+  const getEvalTypeDisplay = (evalType) => {
+    const evalMap = {
+      auto: 'Auto',
+      manual: 'Manual',
+      hybrid: 'Hybrid',
+    }
+    return evalMap[evalType] || evalType
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="flex flex-col lg:flex-row gap-6 max-w-400 mx-auto">
@@ -244,7 +231,6 @@ export function Questions() {
               <h1 className="text-neutral-700 text-xl font-extrabold font-['Inter']">
                 Question Library
               </h1>
-
               <button
                 onClick={handleImportQuestions}
                 className="px-4 py-2 bg-slate-500 rounded text-white text-sm font-medium hover:bg-slate-600 transition-colors whitespace-nowrap"
@@ -283,10 +269,10 @@ export function Questions() {
                   className="flex-1 px-3 py-2 rounded-lg border border-zinc-200 text-neutral-700 text-sm font-normal"
                 >
                   <option value="">All Types</option>
-                  <option value="open-ended">Open-ended</option>
-                  <option value="multiple">Multiple Choice</option>
-                  <option value="single">Single Choice</option>
-                  <option value="coding">Coding Challenge</option>
+                  <option value="text">Text</option>
+                  <option value="single_choice">Single Choice</option>
+                  <option value="multiple_choice">Multiple Choice</option>
+                  <option value="code">Code</option>
                 </select>
 
                 <select
@@ -299,6 +285,18 @@ export function Questions() {
                   <option value="easy">Easy</option>
                   <option value="medium">Medium</option>
                   <option value="hard">Hard</option>
+                </select>
+
+                <select
+                  name="evaluation_type"
+                  value={filters.evaluation_type}
+                  onChange={handleFilterChange}
+                  className="flex-1 px-3 py-2 rounded-lg border border-zinc-200 text-neutral-700 text-sm font-normal"
+                >
+                  <option value="">All Evaluation Types</option>
+                  <option value="auto">Auto</option>
+                  <option value="manual">Manual</option>
+                  <option value="hybrid">Hybrid</option>
                 </select>
 
                 <div className="flex gap-2">
@@ -326,31 +324,32 @@ export function Questions() {
 
             <div>
               <div className="grid grid-cols-12 bg-gray-50 border-b border-zinc-200 text-xs">
-                <div className="col-span-4 p-3">
+                <div className="col-span-3 p-3">
                   <span className="text-neutral-700 font-bold font-['Inter']">
                     Question
                   </span>
                 </div>
-
                 <div className="col-span-2 p-3">
                   <span className="text-neutral-700 font-bold font-['Inter']">
                     Type
                   </span>
                 </div>
-
-                <div className="col-span-2 p-3 pr-1">
+                <div className="col-span-2 p-3">
                   <span className="text-neutral-700 font-bold font-['Inter']">
                     Difficulty
                   </span>
                 </div>
-
-                <div className="col-span-1 p-3 pl-1">
+                <div className="col-span-2 p-3">
+                  <span className="text-neutral-700 font-bold font-['Inter']">
+                    Evaluation
+                  </span>
+                </div>
+                <div className="col-span-1 p-3">
                   <span className="text-neutral-700 font-bold font-['Inter']">
                     Tags
                   </span>
                 </div>
-
-                <div className="col-span-3 p-3">
+                <div className="col-span-2 p-3">
                   <span className="text-neutral-700 font-bold font-['Inter']">
                     Actions
                   </span>
@@ -371,7 +370,8 @@ export function Questions() {
                     No questions found.{' '}
                     {searchQuery ||
                     filters.question_type ||
-                    filters.question_complexity
+                    filters.question_complexity ||
+                    filters.evaluation_type
                       ? 'Try different search or filters'
                       : 'Add your first question'}
                   </div>
@@ -383,7 +383,7 @@ export function Questions() {
                         index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                       }`}
                     >
-                      <div className="col-span-4 p-3">
+                      <div className="col-span-3 p-3">
                         <p className="text-neutral-700 text-xs font-normal font-['Inter'] line-clamp-2">
                           {question.title}
                         </p>
@@ -395,7 +395,7 @@ export function Questions() {
                         </span>
                       </div>
 
-                      <div className="col-span-2 p-3 pr-1">
+                      <div className="col-span-2 p-3">
                         <span
                           className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap
                           ${
@@ -410,7 +410,22 @@ export function Questions() {
                         </span>
                       </div>
 
-                      <div className="col-span-1 p-3 pl-1">
+                      <div className="col-span-2 p-3">
+                        <span
+                          className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap
+                          ${
+                            question.evaluation_type === 'auto'
+                              ? 'bg-blue-100 text-blue-800'
+                              : question.evaluation_type === 'manual'
+                                ? 'bg-orange-100 text-orange-800'
+                                : 'bg-purple-100 text-purple-800'
+                          }`}
+                        >
+                          {getEvalTypeDisplay(question.evaluation_type)}
+                        </span>
+                      </div>
+
+                      <div className="col-span-1 p-3">
                         <div className="flex flex-wrap gap-1">
                           {question.tags && question.tags.length > 0 ? (
                             <span
@@ -439,7 +454,7 @@ export function Questions() {
                         </div>
                       </div>
 
-                      <div className="col-span-3 p-3">
+                      <div className="col-span-2 p-3">
                         <div className="flex justify-center gap-1">
                           <button
                             onClick={() => handleViewDetails(question)}
@@ -501,7 +516,7 @@ export function Questions() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label
                     htmlFor="question-type"
@@ -518,10 +533,10 @@ export function Questions() {
                     required
                   >
                     <option value="">Select</option>
-                    <option value="open-ended">Open-ended</option>
-                    <option value="multiple">Multiple Choice</option>
-                    <option value="single">Single Choice</option>
-                    <option value="coding">Coding Challenge</option>
+                    <option value="text">Text</option>
+                    <option value="single_choice">Single Choice</option>
+                    <option value="multiple_choice">Multiple Choice</option>
+                    <option value="code">Code</option>
                   </select>
                 </div>
 
@@ -544,6 +559,27 @@ export function Questions() {
                     <option value="easy">Easy</option>
                     <option value="medium">Medium</option>
                     <option value="hard">Hard</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="evaluation_type"
+                    className="block text-neutral-700 text-sm font-medium mb-1"
+                  >
+                    Evaluation
+                  </label>
+                  <select
+                    id="evaluation_type"
+                    name="evaluation_type"
+                    value={newQuestion.evaluation_type}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
+                    required
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="manual">Manual</option>
+                    <option value="hybrid">Hybrid</option>
                   </select>
                 </div>
               </div>

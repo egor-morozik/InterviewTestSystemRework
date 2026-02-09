@@ -23,6 +23,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
         "question_type",
         "question_complexity",
         "tags__title",
+        "evaluation_type",
     ]
 
     search_fields = [
