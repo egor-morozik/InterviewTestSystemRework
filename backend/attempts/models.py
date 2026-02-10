@@ -79,13 +79,13 @@ class Attempt(models.Model):
     def calculate_percents(self):
         all_answers = self.answers.select_related("question").all()
 
-        auto_questions = [answer for answer in all_answers if answer.question.evaluation_type in ["auto", "hybrid"]]
-        auto_correct = sum(1 for a in auto_questions if (a.auto_score or 0) > 0)
+        auto_questions = [answer for answer in all_answers if answer.auto_score is not None]
+        auto_correct = sum(1 for answer in auto_questions if (answer.auto_score or 0) > 0)
         self.auto_score_percent = (auto_correct / len(auto_questions) * 100) if auto_questions else 0
 
-        manual_questions = [answer for answer in all_answers if answer.question.evaluation_type in ["manual", "hybrid"]]
-        manual_correct = sum(1 for a in manual_questions if a.manual_score)
-        self.manual_score_percent = (manual_correct / len(manual_questions) * 100) if manual_questions else 0
+        manually_graded = [answer for answer in all_answers if answer.manual_score is not None]
+        manual_correct = sum(1 for answer in manually_graded if answer.manual_score > 0)
+        self.manual_score_percent = (manual_correct / len(manually_graded) * 100) if manually_graded else 0
 
     def mark_as_completed(self):
         self.completed = True
@@ -104,6 +104,7 @@ class ActivityLog(models.Model):
         VISIBLE = "visible", "вернулся"
         COPYTEXT = "copytext", "скопировал текст"
         SCREENSHOT = "screenshot", "сделал скриншот"
+        OPEN_DEVELOPER_TOOLS = "opendevtools", "открыл инструменты разработчика"
 
     event_type = models.CharField(
         "Тип события",
@@ -183,3 +184,4 @@ class Answer(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self.attempt.calculate_percents()
+        self.attempt.save()

@@ -18,26 +18,26 @@ def evaluate_answer(attempt_id):
         for answer in attempt.answers.all():
             question = answer.question
 
-            if question.is_manual_verification_only:
+            if question.evaluation_type == question.QuestionEvalTypes.MANUAL:
                 continue
 
             expected = question.get_expected_answer
 
             candidate_reply = answer.response
 
+            def evaluate_answer(answer, is_right):
+                answer.auto_score = 1 if is_right else 0
+
             match question.question_type:
                 case question.QuestionType.TEXT:
-                    if str(candidate_reply) == str(expected):
-                        answer.auto_score = 1
+                    evaluate_answer(answer, str(candidate_reply) == str(expected))
 
                 case question.QuestionType.SINGLE_CHOICE:
-                    if str(candidate_reply) == str(expected):
-                        answer.auto_score = 1
+                    evaluate_answer(answer, str(candidate_reply) == str(expected))
 
                 case question.QuestionType.MULTIPLE_CHOICE:
                     candidate_list = sorted(json.loads(candidate_reply))
-                    if candidate_list == expected:
-                        answer.auto_score = 1
+                    evaluate_answer(answer, candidate_list == expected)
 
                 case _:
                     continue
@@ -47,3 +47,6 @@ def evaluate_answer(attempt_id):
                     "auto_score",
                 ],
             )
+
+        attempt.calculate_percents()
+        attempt.save()
