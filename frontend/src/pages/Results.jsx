@@ -7,12 +7,14 @@ export function Results() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedResult, setSelectedResult] = useState(null)
-  const [editingAnswer, setEditingAnswer] = useState(null)
-  const [answerScore, setAnswerScore] = useState('')
+  const [isGradingMode, setIsGradingMode] = useState(false)
+  const [gradingScores, setGradingScores] = useState({}) // {answerId: score}
 
   const [filters, setFilters] = useState({
-    minScore: '',
-    maxScore: '',
+    autoScoreMin: '',
+    autoScoreMax: '',
+    manualScoreMin: '',
+    manualScoreMax: '',
   })
 
   const [sortBy, setSortBy] = useState('date')
@@ -26,6 +28,22 @@ export function Results() {
 
       if (searchQuery) {
         params.search = searchQuery
+      }
+
+      // Auto score filters
+      if (filters.autoScoreMin) {
+        params.auto_score_percent_min = filters.autoScoreMin
+      }
+      if (filters.autoScoreMax) {
+        params.auto_score_percent_max = filters.autoScoreMax
+      }
+
+      // Manual score filters
+      if (filters.manualScoreMin) {
+        params.manual_score_percent_min = filters.manualScoreMin
+      }
+      if (filters.manualScoreMax) {
+        params.manual_score_percent_max = filters.manualScoreMax
       }
 
       // Сортировка
@@ -45,7 +63,7 @@ export function Results() {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, sortBy])
+  }, [searchQuery, sortBy, filters])
 
   // Загрузка результатов
   useEffect(() => {
@@ -69,99 +87,126 @@ export function Results() {
     setSortBy(e.target.value)
   }
 
-  const handleViewResult = (result) => {
-    setSelectedResult(result)
+  const handleViewResult = async (result) => {
+    try {
+      const fullResult = await resultsService.getResult(result.id)
+      console.log('Loaded result:', fullResult)
+      setSelectedResult(fullResult)
+      setIsGradingMode(false)
+    } catch (err) {
+      console.error('Error loading result details:', err)
+      alert('Failed to load result details')
+    }
   }
 
-  const handleEvaluateAnswer = (answer) => {
-    setEditingAnswer(answer)
-    setAnswerScore(
-      answer.manual_score || answer.manual_score === 0
-        ? answer.manual_score.toString()
-        : ''
-    )
+  const handleGradeResult = async (result) => {
+    try {
+      const fullResult = await resultsService.getResult(result.id)
+      console.log('[handleGradeResult] Loaded result for grading:', fullResult)
+      console.log('[handleGradeResult] Total answers:', fullResult.answers?.length || 0)
+      fullResult.answers?.forEach((ans, idx) => {
+        console.log(`[handleGradeResult] Answer ${idx}: id=${ans.id}, question=${ans.question_text}, manual_score=${ans.manual_score}`)
+      })
+      
+      setSelectedResult(fullResult)
+      // Initialize grading scores with current manual_score values
+      const initialScores = {}
+      fullResult.answers?.forEach((answer) => {
+        initialScores[answer.id] = answer.manual_score !== null && answer.manual_score !== undefined ? answer.manual_score : 0
+      })
+      console.log('[handleGradeResult] Initial grading scores:', initialScores)
+      setGradingScores(initialScores)
+      setIsGradingMode(true)
+    } catch (err) {
+      console.error('[handleGradeResult] Error loading result details:', err)
+      setError(`Failed to load result details: ${err.message}`)
+    }
   }
 
-  const handleSaveAnswerScore = async () => {
-    if (!editingAnswer || answerScore === '') {
-      alert('Please enter a score')
-      return
-    }
+  const handleScoreChange = (answerId, value) => {
+    const score = parseInt(value) || 0
+    if (score < 0 || score > 1) return
+    setGradingScores((prev) => ({
+      ...prev,
+      [answerId]: score,
+    }))
+  }
 
-    const score = parseInt(answerScore)
-    if (isNaN(score) || score < 0 || score > 100) {
-      alert('Score must be a number between 0 and 100')
-      return
-    }
+  const handleSaveAllScores = async () => {
+    if (!selectedResult) return
 
     try {
       setError(null)
+      let updatedPercent = null
 
-      // Обновляем оценку ответа
-      await resultsService.updateAnswerScore(
-        selectedResult.id,
-        editingAnswer.id,
-        { manual_score: score }
-      )
+      // Save all grading scores
+      for (const [answerId, score] of Object.entries(gradingScores)) {
+        console.log(`[handleSaveAllScores] Saving score for answer ${answerId}: ${score}`)
+        console.log(`[handleSaveAllScores] URL would be: /results/${selectedResult.id}/answer/${answerId}/score/`)
+        
+        try {
+          const response = await resultsService.updateAnswerScore(
+            selectedResult.id,
+            answerId,
+            { manual_score: score }
+          )
+          console.log(`[handleSaveAllScores] API Response for answer ${answerId}:`, response)
+          if (response && response.manual_score_percent !== undefined) {
+            updatedPercent = response.manual_score_percent
+          }
+        } catch (answerErr) {
+          console.error(`[handleSaveAllScores] Error saving answer ${answerId}:`, answerErr)
+          if (answerErr.response) {
+            console.error(`[handleSaveAllScores] Error response status:`, answerErr.response.status)
+            console.error(`[handleSaveAllScores] Error response data:`, answerErr.response.data)
+          }
+          throw answerErr
+        }
+      }
 
-      // Обновляем локальное состояние
+      console.log(`[handleSaveAllScores] Final updatedPercent: ${updatedPercent}`)
+
+      // Update the selected result
+      setSelectedResult({
+        ...selectedResult,
+        manual_score_percent: updatedPercent,
+        answers: selectedResult.answers?.map((ans) => ({
+          ...ans,
+          manual_score: gradingScores[ans.id] !== undefined ? gradingScores[ans.id] : ans.manual_score,
+        })) || [],
+      })
+
+      // Update results list
       const updatedResults = results.map((result) => {
         if (result.id === selectedResult.id) {
-          const updatedAnswers =
-            result.answers?.map((ans) =>
-              ans.id === editingAnswer.id
-                ? { ...ans, manual_score: score }
-                : ans
-            ) || []
-
-          // Пересчитываем ручную оценку
-          const manualQuestions = updatedAnswers.filter(
-            (ans) =>
-              ans.question?.evaluation_type === 'manual' ||
-              ans.question?.evaluation_type === 'hybrid'
-          )
-          const manualCorrect = manualQuestions.filter(
-            (ans) => ans.manual_score > 0
-          ).length
-          const newManualPercent =
-            manualQuestions.length > 0
-              ? (manualCorrect / manualQuestions.length) * 100
-              : 0
-
           return {
             ...result,
-            answers: updatedAnswers,
-            manual_score_percent: newManualPercent,
+            manual_score_percent: updatedPercent,
           }
         }
         return result
       })
-
       setResults(updatedResults)
 
-      // Обновляем selectedResult если он открыт
-      if (selectedResult) {
-        const updatedSelected = updatedResults.find(
-          (r) => r.id === selectedResult.id
-        )
-        if (updatedSelected) {
-          setSelectedResult(updatedSelected)
-        }
-      }
-
-      // Закрываем модальное окно
-      setEditingAnswer(null)
-      setAnswerScore('')
+      alert('Scores saved successfully!')
+      setIsGradingMode(false)
+      setGradingScores({})
+      
+      // Refresh the full results from backend to ensure everything is in sync
+      setTimeout(() => fetchResults(), 500)
     } catch (err) {
-      setError('Failed to save score')
-      console.error('Error saving score:', err)
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to save scores'
+      setError(`Failed to save scores: ${errorMsg}`)
+      console.error('[handleSaveAllScores] Error saving scores:', err)
     }
   }
 
   const handleClearFilters = () => {
     setFilters({
-      minScore: '',
-      maxScore: '',
+      autoScoreMin: '',
+      autoScoreMax: '',
+      manualScoreMin: '',
+      manualScoreMax: '',
     })
     setSortBy('date')
     fetchResults()
@@ -225,18 +270,8 @@ export function Results() {
     return null
   }
 
-  // Фильтрация по диапазону оценок
-  const filteredResults = results.filter((result) => {
-    const overallScore = getOverallScore(result)
-    if (overallScore === null) return true
-
-    const matchesMinScore =
-      !filters.minScore || overallScore >= parseFloat(filters.minScore)
-    const matchesMaxScore =
-      !filters.maxScore || overallScore <= parseFloat(filters.maxScore)
-
-    return matchesMinScore && matchesMaxScore
-  })
+  // Фильтрация происходит на бэке, используем results напрямую
+  const filteredResults = results
 
   // Сортировка
   const sortedResults = [...filteredResults].sort((a, b) => {
@@ -308,7 +343,7 @@ export function Results() {
               <div className="overflow-hidden">
                 {/* Заголовки таблицы для десктопа */}
                 <div className="hidden md:grid md:grid-cols-12 bg-gray-50 border-b border-zinc-200">
-                  <div className="col-span-3 p-4">
+                  <div className="col-span-2 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
                       Candidate
                     </span>
@@ -328,7 +363,7 @@ export function Results() {
                       Manual Score
                     </span>
                   </div>
-                  <div className="col-span-1 p-4">
+                  <div className="col-span-2 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
                       Actions
                     </span>
@@ -414,6 +449,12 @@ export function Results() {
                               >
                                 View
                               </button>
+                              <button
+                                onClick={() => handleGradeResult(result)}
+                                className="px-3 py-1.5 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
+                              >
+                                Grade
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -421,7 +462,7 @@ export function Results() {
                         {/* Десктопная строка */}
                         <div className="hidden md:grid md:grid-cols-12">
                           {/* Кандидат */}
-                          <div className="col-span-3 p-4">
+                          <div className="col-span-2 p-4">
                             <div className="text-neutral-700 text-sm font-medium">
                               {result.candidate?.full_name ||
                                 'Unknown Candidate'}
@@ -466,14 +507,21 @@ export function Results() {
                           </div>
 
                           {/* Действия */}
-                          <div className="col-span-1 p-4">
-                            <div className="flex flex-wrap gap-1">
+                          <div className="col-span-2 p-4">
+                            <div className="flex flex-wrap gap-2">
                               <button
                                 onClick={() => handleViewResult(result)}
-                                className="px-2 py-1 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
+                                className="px-3 py-1.5 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
                                 title="View Details"
                               >
                                 View
+                              </button>
+                              <button
+                                onClick={() => handleGradeResult(result)}
+                                className="px-3 py-1.5 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
+                                title="Grade Answers"
+                              >
+                                Grade
                               </button>
                             </div>
                           </div>
@@ -556,33 +604,66 @@ export function Results() {
                 </header>
 
                 <div className="p-4 md:p-6 space-y-6">
-                  {/* Диапазон оценок */}
+                  {/* Диапазон автооценки */}
                   <div className="space-y-3">
                     <label className="block text-neutral-700 text-sm font-medium">
-                      Score Range (0-100)
+                      Auto Score (%) Range
                     </label>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <input
                           type="number"
-                          name="minScore"
-                          value={filters.minScore}
+                          name="autoScoreMin"
+                          value={filters.autoScoreMin}
                           onChange={handleFilterChange}
                           min="0"
                           max="100"
-                          placeholder="Min"
+                          placeholder="Min %"
                           className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
                         />
                       </div>
                       <div>
                         <input
                           type="number"
-                          name="maxScore"
-                          value={filters.maxScore}
+                          name="autoScoreMax"
+                          value={filters.autoScoreMax}
                           onChange={handleFilterChange}
                           min="0"
                           max="100"
-                          placeholder="Max"
+                          placeholder="Max %"
+                          className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Диапазон ручной оценки */}
+                  <div className="space-y-3">
+                    <label className="block text-neutral-700 text-sm font-medium">
+                      Manual Score (%) Range
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <input
+                          type="number"
+                          name="manualScoreMin"
+                          value={filters.manualScoreMin}
+                          onChange={handleFilterChange}
+                          min="0"
+                          max="100"
+                          placeholder="Min %"
+                          className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="number"
+                          name="manualScoreMax"
+                          value={filters.manualScoreMax}
+                          onChange={handleFilterChange}
+                          min="0"
+                          max="100"
+                          placeholder="Max %"
                           className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
                         />
                       </div>
@@ -606,82 +687,60 @@ export function Results() {
         {/* Модальное окно деталей результата */}
         {selectedResult && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-neutral-700">
-                    Result Details
-                  </h3>
+            <div className="bg-white rounded w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+              <div className="p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold">Result Details</h3>
                   <button
                     onClick={() => setSelectedResult(null)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-gray-400 hover:text-gray-600 text-xl"
                   >
                     ✕
                   </button>
                 </div>
 
-                <div className="space-y-6">
+                {error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                )}
+
+                <div className="space-y-4">
                   {/* Основная информация */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <div className="text-sm text-gray-500">Candidate</div>
-                        <div className="font-medium">
-                          {selectedResult.candidate?.full_name || 'Unknown'}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {selectedResult.candidate?.email || ''}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Position</div>
-                        <div className="font-medium">
-                          {selectedResult.candidate?.position ||
-                            'Not specified'}
-                        </div>
-                      </div>
+                  <div className="space-y-2 border-b pb-4">
+                    <div>
+                      <span className="text-gray-600 text-sm">Candidate:</span>
+                      <div className="font-medium">{selectedResult.candidate?.full_name || 'Unknown'}</div>
+                      <div className="text-sm text-gray-600">{selectedResult.candidate?.email || ''}</div>
                     </div>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="text-sm text-gray-500">Test</div>
-                        <div className="font-medium">
-                          {selectedResult.test?.title || 'Unknown'}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {selectedResult.test?.description || ''}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-500">Completed</div>
-                        <div className="font-medium">
-                          {formatDate(selectedResult.completed_at)}
-                        </div>
-                      </div>
+                    <div>
+                      <span className="text-gray-600 text-sm">Position:</span>
+                      <div className="font-medium">{selectedResult.candidate?.position || 'Not specified'}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 text-sm">Test:</span>
+                      <div className="font-medium">{selectedResult.test?.title || 'Unknown'}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 text-sm">Completed:</span>
+                      <div className="font-medium">{formatDate(selectedResult.completed_at)}</div>
                     </div>
                   </div>
 
                   {/* Оценки */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="text-center p-4 bg-gray-50 rounded-lg">
-                      <div className="text-sm text-gray-500 mb-2">
-                        Auto Score
-                      </div>
-                      <div
-                        className={`text-2xl font-bold ${getScoreColor(selectedResult.auto_score_percent).split(' ')[1]}`}
-                      >
+                  <div className="grid grid-cols-2 gap-4 border-b pb-4">
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">Auto Score</div>
+                      <div className="text-xl font-bold">
                         {selectedResult.auto_score_percent !== null &&
                         selectedResult.auto_score_percent !== undefined
                           ? `${parseFloat(selectedResult.auto_score_percent).toFixed(1)}%`
                           : 'N/A'}
                       </div>
                     </div>
-                    <div className="text-center p-4 bg-gray-50 rounded-lg">
-                      <div className="text-sm text-gray-500 mb-2">
-                        Manual Score
-                      </div>
-                      <div
-                        className={`text-2xl font-bold ${getScoreColor(selectedResult.manual_score_percent).split(' ')[1]}`}
-                      >
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">Manual Score</div>
+                      <div className="text-xl font-bold">
                         {selectedResult.manual_score_percent !== null &&
                         selectedResult.manual_score_percent !== undefined
                           ? `${parseFloat(selectedResult.manual_score_percent).toFixed(1)}%`
@@ -691,164 +750,115 @@ export function Results() {
                   </div>
 
                   {/* Ответы */}
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-semibold text-gray-800">
-                      Questions & Answers
+                  <div>
+                    <h4 className="font-semibold mb-3">
+                      Questions & Answers ({selectedResult.answers?.length || 0})
                     </h4>
-                    {selectedResult.answers &&
-                    selectedResult.answers.length > 0 ? (
-                      <div className="space-y-4">
-                        {selectedResult.answers.map((answer) => (
-                          <div
-                            key={answer.id}
-                            className="border border-gray-200 rounded-lg p-4"
-                          >
-                            <div className="flex justify-between items-start mb-3">
-                              <div className="flex-1">
-                                <div className="font-medium text-gray-800 mb-2">
-                                  {answer.question_text || 'Question'}
-                                </div>
-                                <div className="text-sm text-gray-600 mb-3">
-                                  <strong>Answer:</strong>{' '}
-                                  {answer.response || 'No answer'}
-                                </div>
-                              </div>
-                              <div className="ml-4 text-right">
-                                <div className="text-sm text-gray-500 mb-1">
-                                  Auto Score
-                                </div>
-                                <div className="font-medium">
-                                  {answer.auto_score !== null &&
-                                  answer.auto_score !== undefined
-                                    ? `${answer.auto_score}`
-                                    : 'N/A'}
-                                </div>
-                              </div>
+                    {selectedResult.answers && selectedResult.answers.length > 0 ? (
+                      <div className="space-y-3">
+                        {selectedResult.answers.map((answer, idx) => (
+                          <div key={answer.id} className="border p-3 rounded">
+                            <div className="font-medium text-sm mb-2">
+                              Q{idx + 1}: {answer.question_text || 'Question'}
                             </div>
-
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-4">
-                                <div>
-                                  <div className="text-sm text-gray-500 mb-1">
-                                    Manual Score
-                                  </div>
-                                  <div className="font-medium">
-                                    {answer.manual_score !== null &&
-                                    answer.manual_score !== undefined
-                                      ? `${answer.manual_score}`
-                                      : 'Not graded'}
-                                  </div>
-                                </div>
+                            <div className="text-sm text-gray-700 mb-2">
+                              <span className="text-gray-600">Answer:</span> {answer.response || '(No answer)'}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-gray-600">Auto:</span> {answer.auto_score !== null && answer.auto_score !== undefined ? answer.auto_score : 'N/A'}
                               </div>
-                              <button
-                                onClick={() => handleEvaluateAnswer(answer)}
-                                className="px-4 py-2 bg-purple-800 rounded text-white text-sm hover:bg-purple-900 transition-colors"
-                              >
-                                Grade
-                              </button>
+                              <div>
+                                {isGradingMode ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gray-600">Manual:</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="1"
+                                      step="1"
+                                      value={gradingScores[answer.id] !== undefined ? gradingScores[answer.id] : (answer.manual_score || 0)}
+                                      onChange={(e) => handleScoreChange(answer.id, e.target.value)}
+                                      className="w-12 h-6 px-1 border rounded text-sm"
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-600">Manual: {answer.manual_score !== null && answer.manual_score !== undefined ? answer.manual_score : 'N/A'}</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        No answers found for this test
-                      </div>
+                      <div className="text-center py-4 text-gray-500 text-sm">No answers found</div>
                     )}
                   </div>
 
-                  <div className="pt-4 border-t">
+                  {isGradingMode && (
                     <button
-                      onClick={() => setSelectedResult(null)}
-                      className="w-full py-2 bg-gray-200 rounded text-gray-700 hover:bg-gray-300 transition-colors"
+                      onClick={handleSaveAllScores}
+                      className="w-full py-2 bg-purple-800 rounded text-white hover:bg-purple-900 text-sm font-medium mb-2"
                     >
-                      Close
+                      Save Grades
                     </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+                  )}
 
-        {/* Модальное окно для оценки ответа */}
-        {editingAnswer && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-neutral-700">
-                    Grade Answer
-                  </h3>
+                  {/* Активность кандидата */}
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold mb-3">
+                      Activity Log ({selectedResult.activity?.length || 0})
+                    </h4>
+                    {selectedResult.activity && selectedResult.activity.length > 0 ? (
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {selectedResult.activity.map((log, idx) => {
+
+                          const getActivityLabel = (eventType) => {
+                            const labels = {
+                              hidden: 'Left the page',
+                              visible: 'Returned to page',
+                              copytext: 'Copied text',
+                              screenshot: 'Screenshot attempt',
+                            }
+                            return labels[eventType] || eventType
+                          }
+
+                          const getActivityColor = (eventType) => {
+                            const colors = {
+                              hidden: 'bg-red-50 border-red-200',
+                              visible: 'bg-green-50 border-green-200',
+                              copytext: 'bg-yellow-50 border-yellow-200',
+                              screenshot: 'bg-orange-50 border-orange-200',
+                            }
+                            return colors[eventType] || 'bg-gray-50'
+                          }
+
+                          return (
+                            <div key={idx} className={`p-2 rounded border text-sm ${getActivityColor(log.event_type)}`}>
+                              <span className="font-medium">{getActivityLabel(log.event_type)}</span>
+                              <span className="text-gray-500 ml-2">
+                                {new Date(log.timestamp).toLocaleTimeString()}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-gray-500 text-sm">No suspicious activity detected</div>
+                    )}
+                  </div>
+
                   <button
                     onClick={() => {
-                      setEditingAnswer(null)
-                      setAnswerScore('')
+                      setSelectedResult(null)
+                      setIsGradingMode(false)
+                      setGradingScores({})
                     }}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="w-full py-2 bg-gray-200 rounded text-gray-700 hover:bg-gray-300 text-sm mt-4"
                   >
-                    ✕
+                    Close
                   </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="text-sm text-gray-600 mb-2">
-                    {editingAnswer.question_text || 'Question'}
-                  </div>
-
-                  <div className="bg-gray-50 p-3 rounded-lg mb-4">
-                    <div className="text-sm text-gray-500 mb-1">
-                      Candidate's Answer:
-                    </div>
-                    <div className="text-gray-800">
-                      {editingAnswer.response || 'No answer'}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-sm text-gray-500 mb-1">
-                      Current Auto Score
-                    </div>
-                    <div className="font-medium mb-4">
-                      {editingAnswer.auto_score !== null &&
-                      editingAnswer.auto_score !== undefined
-                        ? `${editingAnswer.auto_score}`
-                        : 'N/A'}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">
-                      Manual Score (0-100)
-                    </label>
-                    <input
-                      type="number"
-                      value={answerScore}
-                      onChange={(e) => setAnswerScore(e.target.value)}
-                      min="0"
-                      max="100"
-                      className="w-full px-4 py-2 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
-                      placeholder="Enter manual score"
-                    />
-                  </div>
-
-                  <div className="flex gap-2 pt-4">
-                    <button
-                      onClick={() => {
-                        setEditingAnswer(null)
-                        setAnswerScore('')
-                      }}
-                      className="flex-1 py-2 bg-gray-200 rounded text-gray-700 hover:bg-gray-300 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveAnswerScore}
-                      className="flex-1 py-2 bg-purple-800 rounded text-white hover:bg-purple-900 transition-colors"
-                    >
-                      Save Score
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>

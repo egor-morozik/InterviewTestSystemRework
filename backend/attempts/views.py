@@ -1,3 +1,4 @@
+from django_filters import FilterSet, NumberFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -23,12 +24,28 @@ class AdminAttemptViewSet(viewsets.ModelViewSet):
     queryset = (
         Attempt.objects.select_related("candidate", "test")
         .prefetch_related(
-            "tab_switches",
+            "activity",
             "answers__question",
         )
         .all()
     )
     serializer_class = AdminAttemptSerializer
+
+    def create(self, request, *args, **kwargs):
+        candidate_id = request.data.get("candidate")
+        test_id = request.data.get("test")
+
+        if candidate_id and test_id:
+            existing_attempt = Attempt.objects.filter(
+                candidate_id=candidate_id, 
+                test_id=test_id, 
+                completed=True,
+            ).first()
+
+            if existing_attempt:
+                return Response({"error": "Кандидат уже прошел этот тест."}, status=status.HTTP_400_BAD_REQUEST)
+
+        return super().create(request, *args, **kwargs)
 
 
 class CandidateAttemptViewSet(viewsets.GenericViewSet):
@@ -42,26 +59,27 @@ class CandidateAttemptViewSet(viewsets.GenericViewSet):
         .prefetch_related(
             "activity",
             "answers__question",
-        )
-        .all()
+        ).all()
     )
     serializer_class = CandidateAttemptSerializer
 
     @action(detail=True, methods=["post"], url_path="log")
-    def log_switch(self, request, unique_link):
+    def log_switch(self, request, pk):
         attempt = self.get_object()
         serializer = ActivityLogSerializer(data=request.data)
-        serializer.save(attempt=attempt)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        if serializer.is_valid():
+            serializer.save(attempt=attempt)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["get"], url_path="start")
-    def start(self, request, unique_link):
+    def start(self, request, pk):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
     @action(detail=True, methods=["post"], url_path="finish")
-    def finish(self, request, unique_link):
+    def finish(self, request, pk):
         attempt = self.get_object()
 
         if attempt.completed:
@@ -73,14 +91,43 @@ class CandidateAttemptViewSet(viewsets.GenericViewSet):
         answers_data = request.data.get("answers", [])
 
         answer_serializer = AnswerSerializer(data=answers_data, many=True)
-        answer_serializer.save(attempt=attempt)
+        if answer_serializer.is_valid():
+            answer_serializer.save(attempt=attempt)
 
-        attempt.completed = True
-        attempt.save()
+            attempt.mark_as_completed()
 
-        evaluate_answer.delay(attempt.id)
+            evaluate_answer.delay(attempt.id)
 
-        return Response({"status": "Тест успешно завершен"})
+            return Response({"status": "Тест успешно завершен"})
+
+        return Response(answer_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AttemptFilterSet(FilterSet):
+    """
+    FilterSet для фильтрации результатов тестов по процентам оценок.
+    """
+
+    auto_score_percent_min = NumberFilter(
+        field_name="auto_score_percent", 
+        lookup_expr="gte",
+    )
+    auto_score_percent_max = NumberFilter(
+        field_name="auto_score_percent", 
+        lookup_expr="lte",
+    )
+    manual_score_percent_min = NumberFilter(
+        field_name="manual_score_percent", 
+        lookup_expr="gte",
+    )
+    manual_score_percent_max = NumberFilter(
+        field_name="manual_score_percent", 
+        lookup_expr="lte",
+    )
+
+    class Meta:
+        model = Attempt
+        fields = []
 
 
 class ResultsViewSet(viewsets.ReadOnlyModelViewSet):
@@ -103,10 +150,7 @@ class ResultsViewSet(viewsets.ReadOnlyModelViewSet):
         filters.OrderingFilter,
     ]
 
-    filterset_fields = [
-        "candidate__position",
-        "test__title",
-    ]
+    filterset_class = AttemptFilterSet
 
     search_fields = [
         "candidate__full_name",
@@ -132,6 +176,9 @@ class ResultsViewSet(viewsets.ReadOnlyModelViewSet):
             manual_score = int(manual_score)
             answer.manual_score = manual_score
             answer.save()
-            attempt.calculate_percents()
-            attempt.save()
-            return Response({"message": "Updated successfully"}, status=status.HTTP_200_OK)
+            attempt.refresh_from_db()
+            return Response(
+                {"message": "Updated successfully", "manual_score_percent": float(attempt.manual_score_percent)},
+                status=status.HTTP_200_OK,
+            )
+        return Response({"error": "manual_score is required"}, status=status.HTTP_400_BAD_REQUEST)

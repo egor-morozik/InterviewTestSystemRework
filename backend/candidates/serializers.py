@@ -9,13 +9,17 @@ class CandidateSerializer(serializers.ModelSerializer):
     Сериализатор данных кандидата в системе.
     """
 
+    tests_completed = serializers.SerializerMethodField()
+
     class Meta:
         model = Candidate
         fields = [
+            "id",
             "full_name",
             "email",
             "status",
             "position",
+            "tests_completed",
         ]
         validators = [
             UniqueTogetherValidator(
@@ -24,6 +28,8 @@ class CandidateSerializer(serializers.ModelSerializer):
                     "email",
                     "position",
                 ],
-                message="Вы уже подали заявку на эту должность.",
             ),
         ]
+
+    def get_tests_completed(self, obj):
+        return obj.attempts.filter(completed=True).count()

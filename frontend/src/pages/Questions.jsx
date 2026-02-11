@@ -9,12 +9,14 @@ export function Questions() {
 
   const [newQuestion, setNewQuestion] = useState({
     title: '',
-    question_type: '',
-    question_complexity: '',
+    content: '',
+    question_type: 'text',
+    question_complexity: 'easy',
     evaluation_type: 'auto',
     tags: '',
     answer: '',
     tags_titles: [],
+    choices: [],
   })
 
   const [editingQuestion, setEditingQuestion] = useState(null)
@@ -45,6 +47,10 @@ export function Questions() {
       }
 
       const response = await questionsService.getAllQuestions(params)
+      console.log('Questions loaded:', response)
+      if (response && response.length > 0) {
+        console.log('First question structure:', response[0])
+      }
       setQuestions(response)
     } catch (err) {
       setError('Failed to load questions')
@@ -74,15 +80,39 @@ export function Questions() {
     try {
       setError(null)
 
+      // Валидация обязательных полей
+      if (!newQuestion.title || !newQuestion.title.trim()) {
+        alert('Please enter question title')
+        return
+      }
+      if (!newQuestion.content || !newQuestion.content.trim()) {
+        alert('Please enter question content')
+        return
+      }
+      if (!newQuestion.question_type) {
+        alert('Please select question type')
+        return
+      }
+      if (!newQuestion.question_complexity) {
+        alert('Please select question complexity')
+        return
+      }
+
       const tagsArray = newQuestion.tags
         .split('\n')
         .map((tag) => tag.trim())
         .filter((tag) => tag.length > 0)
 
       const questionData = {
-        ...newQuestion,
-        tags_titles: tagsArray,
+        title: newQuestion.title,
+        content: newQuestion.content,
+        question_type: newQuestion.question_type,
+        question_complexity: newQuestion.question_complexity,
         evaluation_type: newQuestion.evaluation_type || 'auto',
+        tags_list: tagsArray,
+        expected_answer: newQuestion.answer || '',
+        extra_data: {},
+        choices: newQuestion.choices || [],
       }
 
       if (editingQuestion) {
@@ -95,6 +125,7 @@ export function Questions() {
         )
       } else {
         const response = await questionsService.createQuestion(questionData)
+        console.log('Created question response:', response)
         setQuestions([...questions, response])
       }
 
@@ -124,6 +155,45 @@ export function Questions() {
     }))
   }
 
+  const handleAddChoice = () => {
+    setNewQuestion((prev) => ({
+      ...prev,
+      choices: [...prev.choices, { text: '', is_correct: false }],
+    }))
+  }
+
+  const handleRemoveChoice = (index) => {
+    setNewQuestion((prev) => ({
+      ...prev,
+      choices: prev.choices.filter((_, i) => i !== index),
+    }))
+  }
+
+  const handleUpdateChoice = (index, field, value) => {
+    setNewQuestion((prev) => ({
+      ...prev,
+      choices: prev.choices.map((choice, i) =>
+        i === index ? { ...choice, [field]: value } : choice
+      ),
+    }))
+  }
+
+  const handleToggleCorrect = (index) => {
+    const isMultiple = newQuestion.question_type === 'multiple_choice'
+    setNewQuestion((prev) => ({
+      ...prev,
+      choices: prev.choices.map((choice, i) =>
+        isMultiple
+          ? i === index
+            ? { ...choice, is_correct: !choice.is_correct }
+            : choice
+          : i === index
+            ? { ...choice, is_correct: !choice.is_correct }
+            : { ...choice, is_correct: false }
+      ),
+    }))
+  }
+
   const handleDeleteQuestion = async (id) => {
     if (!window.confirm('Are you sure you want to delete this question?')) {
       return
@@ -140,17 +210,28 @@ export function Questions() {
   }
 
   const handleEditQuestion = (question) => {
+    console.log('Editing question:', question, 'tags:', question.tags, 'tags_titles:', question.tags_titles)
     setEditingQuestion(question)
+    
+    let tagString = ''
+    if (question.tags && Array.isArray(question.tags) && question.tags.length > 0) {
+      tagString = question.tags
+        .map((t) => (typeof t === 'string' ? t : t.title))
+        .join('\n')
+    } else if (question.tags_titles && Array.isArray(question.tags_titles)) {
+      tagString = question.tags_titles.join('\n')
+    }
+    
     setNewQuestion({
       title: question.title || '',
-      question_type: question.question_type || '',
-      question_complexity: question.question_complexity || '',
+      content: question.content || '',
+      question_type: question.question_type || 'text',
+      question_complexity: question.question_complexity || 'easy',
       evaluation_type: question.evaluation_type || 'auto',
-      tags: Array.isArray(question.tags)
-        ? question.tags.map((t) => t.title).join('\n')
-        : question.tags_titles?.join('\n') || '',
-      answer: question.answer || '',
+      tags: tagString,
+      answer: question.expected_answer || '',
       tags_titles: question.tags_titles || [],
+      choices: question.choices || [],
     })
   }
 
@@ -167,12 +248,14 @@ export function Questions() {
   const handleClearForm = () => {
     setNewQuestion({
       title: '',
-      question_type: '',
-      question_complexity: '',
+      content: '',
+      question_type: 'text',
+      question_complexity: 'easy',
       evaluation_type: 'auto',
       tags: '',
       answer: '',
       tags_titles: [],
+      choices: [],
     })
     setEditingQuestion(null)
   }
@@ -224,9 +307,10 @@ export function Questions() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="flex flex-col lg:flex-row gap-6 max-w-400 mx-auto">
-        <div className="lg:w-2/3">
-          <div className="bg-white rounded-lg shadow-sm border border-neutral-100 overflow-hidden">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="lg:w-2/3">
+            <div className="bg-white rounded-lg shadow-sm border border-neutral-100 overflow-hidden">
             <header className="px-4 py-4 border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <h1 className="text-neutral-700 text-xl font-extrabold font-['Inter']">
                 Question Library
@@ -431,10 +515,12 @@ export function Questions() {
                             <span
                               className="px-1.5 py-0.5 bg-zinc-100 rounded text-neutral-700 text-xs font-normal truncate"
                               title={question.tags
-                                .map((t) => t.title)
+                                .map((t) => (typeof t === 'string' ? t : t.title))
                                 .join(', ')}
                             >
-                              {question.tags[0].title}
+                              {typeof question.tags[0] === 'string'
+                                ? question.tags[0]
+                                : question.tags[0].title}
                               {question.tags.length > 1 &&
                                 ` +${question.tags.length - 1}`}
                             </span>
@@ -455,22 +541,25 @@ export function Questions() {
                       </div>
 
                       <div className="col-span-2 p-3">
-                        <div className="flex justify-center gap-1">
+                        <div className="flex flex-col gap-1">
                           <button
                             onClick={() => handleViewDetails(question)}
-                            className="px-1.5 py-1 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors whitespace-nowrap min-w-12.5"
+                            className="w-full px-2 py-1 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
+                            title="View Details"
                           >
-                            Detail
+                            View
                           </button>
                           <button
                             onClick={() => handleEditQuestion(question)}
-                            className="px-1.5 py-1 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors whitespace-nowrap min-w-11.25"
+                            className="w-full px-2 py-1 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
+                            title="Edit"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDeleteQuestion(question.id)}
-                            className="px-1.5 py-1 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors whitespace-nowrap min-w-12.5"
+                            className="w-full px-2 py-1 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
+                            title="Delete"
                           >
                             Delete
                           </button>
@@ -516,6 +605,25 @@ export function Questions() {
                 </div>
               </div>
 
+              <div>
+                <label
+                  htmlFor="question-content"
+                  className="block text-neutral-700 text-sm font-medium mb-1"
+                >
+                  Question Content (Description)
+                </label>
+                <textarea
+                  id="question-content"
+                  name="content"
+                  value={newQuestion.content}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 text-neutral-700 text-sm resize-none"
+                  placeholder="Enter the full question text that candidates will see..."
+                  rows={4}
+                  required
+                />
+              </div>
+
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label
@@ -532,7 +640,6 @@ export function Questions() {
                     className="w-full px-3 py-2 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
                     required
                   >
-                    <option value="">Select</option>
                     <option value="text">Text</option>
                     <option value="single_choice">Single Choice</option>
                     <option value="multiple_choice">Multiple Choice</option>
@@ -555,7 +662,6 @@ export function Questions() {
                     className="w-full px-3 py-2 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
                     required
                   >
-                    <option value="">Select</option>
                     <option value="easy">Easy</option>
                     <option value="medium">Medium</option>
                     <option value="hard">Hard</option>
@@ -584,6 +690,68 @@ export function Questions() {
                 </div>
               </div>
 
+              {/* Choices для типов с выбором */}
+              {(newQuestion.question_type === 'single_choice' ||
+                newQuestion.question_type === 'multiple_choice') && (
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-neutral-700 text-sm font-medium">
+                      Answer Options
+                      {newQuestion.question_type === 'single_choice' &&
+                        ' (select one correct)'}
+                      {newQuestion.question_type === 'multiple_choice' &&
+                        ' (select one or more correct)'}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddChoice}
+                      className="px-3 py-1 bg-blue-600 rounded text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      + Add Option
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {newQuestion.choices.map((choice, index) => (
+                      <div
+                        key={index}
+                        className="flex gap-2 items-center p-2 bg-gray-50 rounded-lg border border-gray-200"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={choice.is_correct || false}
+                          onChange={() => handleToggleCorrect(index)}
+                          className="w-4 h-4 cursor-pointer"
+                          title="Mark as correct"
+                        />
+                        <input
+                          type="text"
+                          value={choice.text || ''}
+                          onChange={(e) =>
+                            handleUpdateChoice(index, 'text', e.target.value)
+                          }
+                          placeholder={`Option ${index + 1}`}
+                          className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-neutral-700 text-sm outline-none focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveChoice(index)}
+                          className="px-2 py-1 bg-red-100 rounded text-red-600 text-xs font-medium hover:bg-red-200 transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {newQuestion.choices.length === 0 && (
+                    <p className="text-gray-400 text-xs mt-2">
+                      No options yet. Click "+ Add Option" to add choices.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label
                   htmlFor="tags"
@@ -597,8 +765,8 @@ export function Questions() {
                   value={newQuestion.tags}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 rounded-lg border border-zinc-200 text-neutral-700 text-sm resize-none"
-                  placeholder="JavaScript"
-                  rows={1}
+                  placeholder="React&#10;JavaScript&#10;Frontend"
+                  rows={3}
                 />
               </div>
 
@@ -607,7 +775,7 @@ export function Questions() {
                   htmlFor="answer"
                   className="block text-neutral-700 text-sm font-medium mb-1"
                 >
-                  Answer
+                  Answer (for text/code questions)
                 </label>
                 <textarea
                   id="answer"
@@ -617,7 +785,6 @@ export function Questions() {
                   className="w-full px-3 py-2 rounded-lg border border-zinc-200 text-neutral-700 text-sm resize-none"
                   placeholder="Enter the answer here..."
                   rows={2}
-                  required
                 />
               </div>
 
@@ -632,7 +799,13 @@ export function Questions() {
 
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-slate-500 rounded-lg text-white text-sm font-medium hover:bg-slate-600 transition-colors"
+                  disabled={
+                    !newQuestion.title.trim() ||
+                    !newQuestion.content.trim() ||
+                    !newQuestion.question_type ||
+                    !newQuestion.question_complexity
+                  }
+                  className="px-4 py-1.5 bg-slate-500 rounded-lg text-white text-sm font-medium hover:bg-slate-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                   {editingQuestion ? 'Update' : 'Add Question'}
                 </button>
@@ -640,6 +813,7 @@ export function Questions() {
             </form>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

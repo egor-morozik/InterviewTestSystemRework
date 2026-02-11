@@ -16,7 +16,7 @@ export function Candidates() {
     full_name: '',
     email: '',
     position: '',
-    status: 'pending',
+    status: 'test',
   })
 
   // Загрузка кандидатов
@@ -161,19 +161,17 @@ Created: ${new Date(candidate.created_at).toLocaleDateString()}
       full_name: '',
       email: '',
       position: '',
-      status: 'pending',
+      status: 'test',
     })
   }
 
   // Функция для получения цвета статуса
   const getStatusColor = (status) => {
     switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800'
-      case 'completed':
-        return 'bg-blue-100 text-blue-800'
-      case 'pending':
+      case 'test':
         return 'bg-yellow-100 text-yellow-800'
+      case 'interview':
+        return 'bg-blue-100 text-blue-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
@@ -182,12 +180,10 @@ Created: ${new Date(candidate.created_at).toLocaleDateString()}
   // Функция для получения текста статуса
   const getStatusText = (status) => {
     switch (status) {
-      case 'active':
-        return 'Active'
-      case 'completed':
-        return 'Completed'
-      case 'pending':
-        return 'Pending'
+      case 'test':
+        return 'Testing'
+      case 'interview':
+        return 'Interview'
       default:
         return status
     }
@@ -197,12 +193,6 @@ Created: ${new Date(candidate.created_at).toLocaleDateString()}
   const getTestsCompleted = (candidate) => {
     // Здесь можно добавить логику для получения реального количества тестов
     return candidate.tests_completed || 0
-  }
-
-  // Форматируем дату
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString()
   }
 
   // Получаем уникальные позиции для фильтра
@@ -270,9 +260,8 @@ Created: ${new Date(candidate.created_at).toLocaleDateString()}
                     className="px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm font-normal"
                   >
                     <option value="">All Statuses</option>
-                    <option value="active">Active</option>
-                    <option value="completed">Completed</option>
-                    <option value="pending">Pending</option>
+                    <option value="test">Testing</option>
+                    <option value="interview">Interview</option>
                   </select>
 
                   <select
@@ -323,12 +312,7 @@ Created: ${new Date(candidate.created_at).toLocaleDateString()}
                       Status
                     </span>
                   </div>
-                  <div className="col-span-12 md:col-span-2 p-4 hidden md:block">
-                    <span className="text-neutral-700 text-sm font-bold font-['Inter']">
-                      Date Added
-                    </span>
-                  </div>
-                  <div className="col-span-12 md:col-span-2 p-4">
+                  <div className="col-span-12 md:col-span-4 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
                       Actions
                     </span>
@@ -336,7 +320,7 @@ Created: ${new Date(candidate.created_at).toLocaleDateString()}
                 </div>
 
                 {/* Список кандидатов */}
-                <div className="min-w-200">
+                <div>
                   {loading ? (
                     <div className="text-center py-8 text-gray-500">
                       Loading candidates...
@@ -387,33 +371,26 @@ Created: ${new Date(candidate.created_at).toLocaleDateString()}
                           </span>
                         </div>
 
-                        {/* Дата добавления */}
-                        <div className="col-span-12 md:col-span-2 p-4 hidden md:block">
-                          <div className="text-neutral-700 text-sm font-normal">
-                            {formatDate(candidate.created_at)}
-                          </div>
-                        </div>
-
                         {/* Действия */}
-                        <div className="col-span-12 md:col-span-2 p-4">
-                          <div className="flex flex-wrap gap-1">
+                        <div className="col-span-12 md:col-span-4 p-4">
+                          <div className="flex flex-col gap-2">
                             <button
                               onClick={() => handleSendTest(candidate)}
-                              className="px-2 py-1 bg-blue-600 rounded text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+                              className="w-full px-2 py-2 bg-blue-600 rounded text-white text-xs font-medium hover:bg-blue-700 transition-colors"
                               title="Send Test"
                             >
                               Send
                             </button>
                             <button
                               onClick={() => handleViewDetails(candidate)}
-                              className="px-2 py-1 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
+                              className="w-full px-2 py-2 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
                               title="View Details"
                             >
                               Details
                             </button>
                             <button
                               onClick={() => handleEditCandidate(candidate)}
-                              className="px-2 py-1 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
+                              className="w-full px-2 py-2 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
                               title="Edit"
                             >
                               Edit
@@ -422,7 +399,7 @@ Created: ${new Date(candidate.created_at).toLocaleDateString()}
                               onClick={() =>
                                 handleDeleteCandidate(candidate.id)
                               }
-                              className="px-2 py-1 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
+                              className="w-full px-2 py-2 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
                               title="Delete"
                             >
                               Delete
@@ -514,9 +491,8 @@ Created: ${new Date(candidate.created_at).toLocaleDateString()}
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
                     >
-                      <option value="pending">Pending</option>
-                      <option value="active">Active</option>
-                      <option value="completed">Completed</option>
+                      <option value="test">Testing</option>
+                      <option value="interview">Interview</option>
                     </select>
                   </div>
                 </div>

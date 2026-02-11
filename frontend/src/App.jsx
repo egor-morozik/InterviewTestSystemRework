@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router'
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { Questions } from './pages/Questions'
 import { Tests } from './pages/Tests'
 import { Candidates } from './pages/Candidates'
@@ -17,7 +17,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/candidate_test" element={<CandidateTestLayout />} />
+        <Route path="/test/:id" element={<CandidateTestLayout />} />
 
         <Route
           path="*"

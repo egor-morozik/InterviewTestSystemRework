@@ -38,6 +38,8 @@ class TestSerializer(serializers.ModelSerializer):
 
     test_questions = TestQuestionSerializer(
         many=True,
+        required=False,
+        allow_empty=True,
     )
 
     class Meta:
@@ -51,12 +53,15 @@ class TestSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        questions_data = validated_data.pop("test_questions")
+        questions_data = validated_data.pop("test_questions", [])
         test = Test.objects.create(**validated_data)
 
-        TestQuestion.objects.bulk_create(
-            [TestQuestion(test=test, **item) for item in questions_data],
-        )
+        if questions_data:
+            TestQuestion.objects.bulk_create(
+                [TestQuestion(test=test, **item) for item in questions_data],
+            )
+
+        return test
 
     def update(self, instance, validated_data):
         questions_data = validated_data.pop("test_questions", None)

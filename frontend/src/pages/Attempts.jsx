@@ -17,8 +17,6 @@ export function Attempts() {
   const [newAttempt, setNewAttempt] = useState({
     candidate: '',
     test: '',
-    unique_link: '',
-    send_email: false,
   })
 
   // Данные для выпадающих списков
@@ -113,10 +111,6 @@ export function Attempts() {
       const attemptData = {
         candidate: parseInt(newAttempt.candidate),
         test: parseInt(newAttempt.test),
-        unique_link: newAttempt.unique_link || generateUniqueLink(),
-        send_email: newAttempt.send_email,
-        status: 'pending',
-        completed: false,
       }
 
       // Отправляем запрос на создание попытки
@@ -129,8 +123,6 @@ export function Attempts() {
       setNewAttempt({
         candidate: '',
         test: '',
-        unique_link: '',
-        send_email: false,
       })
 
       console.log('Created attempt:', response)
@@ -163,15 +155,16 @@ export function Attempts() {
   }
 
   const handleViewDetails = (attempt) => {
+    const link = `${window.location.origin}/test/${attempt.id}`
     const details = `
-Candidate: ${attempt.candidate?.full_name || 'Unknown'}
-Test: ${attempt.test?.title || 'Unknown'}
-Status: ${attempt.status}
+Candidate: ${attempt.candidate_name || 'Unknown'}
+Email: ${attempt.candidate_email || 'No email'}
+Test: ${attempt.test_title || 'Unknown'}
 Completed: ${attempt.completed ? 'Yes' : 'No'}
-Unique Link: ${attempt.unique_link}
-Created: ${new Date(attempt.created_at).toLocaleDateString()}
-Score: ${attempt.score || 'Not evaluated'}
-Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min ${attempt.time_spent % 60} sec` : 'N/A'}
+Test ID: ${attempt.id}
+Auto Score: ${attempt.auto_score_percent || 0}%
+Manual Score: ${attempt.manual_score_percent || 0}%
+Test Link: ${link}
     `
     alert(details)
   }
@@ -179,16 +172,10 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
   const handleResendAttempt = async (attempt) => {
     try {
       setError(null)
-
-      if (attempt.send_email) {
-        // TODO: Реализовать API для повторной отправки email
-        alert('Email resend functionality will be implemented soon')
-      } else {
-        // Просто показываем ссылку для копирования
-        const link = `${window.location.origin}/test/${attempt.unique_link}`
-        navigator.clipboard.writeText(link)
-        alert(`Link copied to clipboard: ${link}`)
-      }
+      // Показываем ссылку для копирования
+      const link = `${window.location.origin}/test/${attempt.id}`
+      navigator.clipboard.writeText(link)
+      alert(`Link copied to clipboard: ${link}`)
     } catch (err) {
       setError('Failed to resend attempt')
       console.error('Error resending attempt:', err)
@@ -199,29 +186,16 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
     setNewAttempt({
       candidate: '',
       test: '',
-      unique_link: '',
-      send_email: false,
     })
-  }
-
-  // Генерация уникальной ссылки
-  const generateUniqueLink = () => {
-    const randomId = Math.random().toString(36).substr(2, 9)
-    return randomId
-  }
-
-  const handleGenerateLink = () => {
-    const uniqueLink = generateUniqueLink()
-    setNewAttempt((prev) => ({ ...prev, unique_link: uniqueLink }))
   }
 
   // Фильтрация попыток
   const filteredAttempts = attempts.filter((attempt) => {
     const matchesSearch =
-      (attempt.candidate?.full_name?.toLowerCase() || '').includes(
+      (attempt.candidate_name?.toLowerCase() || '').includes(
         searchQuery.toLowerCase()
       ) ||
-      (attempt.test?.title?.toLowerCase() || '').includes(
+      (attempt.test_title?.toLowerCase() || '').includes(
         searchQuery.toLowerCase()
       )
 
@@ -236,12 +210,12 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
 
   // Получаем имя кандидата
   const getCandidateName = (attempt) => {
-    return attempt.candidate?.full_name || 'Unknown Candidate'
+    return attempt.candidate_name || 'Unknown Candidate'
   }
 
   // Получаем название теста
   const getTestName = (attempt) => {
-    return attempt.test?.title || 'Unknown Test'
+    return attempt.test_title || 'Unknown Test'
   }
 
   // Получаем статус попытки
@@ -342,14 +316,19 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
               <div className="overflow-hidden">
                 {/* Заголовки таблицы для десктопа */}
                 <div className="hidden md:grid md:grid-cols-12 bg-gray-50 border-b border-zinc-200">
-                  <div className="col-span-3 p-4">
+                  <div className="col-span-2 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
                       Candidate
                     </span>
                   </div>
-                  <div className="col-span-4 p-4">
+                  <div className="col-span-2 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
                       Test
+                    </span>
+                  </div>
+                  <div className="col-span-2 p-4">
+                    <span className="text-neutral-700 text-sm font-bold font-['Inter']">
+                      Link
                     </span>
                   </div>
                   <div className="col-span-2 p-4">
@@ -357,12 +336,7 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
                       Status
                     </span>
                   </div>
-                  <div className="col-span-1 p-4">
-                    <span className="text-neutral-700 text-sm font-bold font-['Inter']">
-                      Score
-                    </span>
-                  </div>
-                  <div className="col-span-2 p-4">
+                  <div className="col-span-4 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
                       Actions
                     </span>
@@ -436,37 +410,58 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
                                   attempt.created_at
                                 ).toLocaleDateString()}
                               </span>
-                              {attempt.score !== null && (
-                                <span className="font-medium">
-                                  Score: {attempt.score}%
-                                </span>
-                              )}
                             </div>
 
-                            <div className="flex flex-wrap gap-2 pt-2">
+                            <div className="bg-blue-50 border border-blue-200 rounded p-2 mt-2">
+                              <p className="text-blue-700 text-xs font-medium mb-1">Test Link:</p>
+                              <div className="flex gap-1 items-center">
+                                <a
+                                  href={`/test/${attempt.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800 hover:underline text-xs break-all flex-1"
+                                  title={`${window.location.origin}/test/${attempt.id}`}
+                                >
+                                  /test/{attempt.id?.slice(0, 6)}...
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const link = `${window.location.origin}/test/${attempt.id}`
+                                    navigator.clipboard.writeText(link)
+                                    alert('Link copied!')
+                                  }}
+                                  className="px-2 py-1 bg-blue-200 text-blue-700 text-xs rounded hover:bg-blue-300 transition-colors whitespace-nowrap"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col gap-1 pt-2">
                               {!attempt.completed && (
                                 <button
                                   onClick={() => handleResendAttempt(attempt)}
-                                  className="px-3 py-1.5 bg-blue-600 rounded text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+                                  className="w-full px-2 py-1 bg-blue-600 rounded text-white text-xs font-medium hover:bg-blue-700 transition-colors"
                                 >
                                   Resend
                                 </button>
                               )}
                               <button
                                 onClick={() => handleViewDetails(attempt)}
-                                className="px-3 py-1.5 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
+                                className="w-full px-2 py-1 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
                               >
                                 Details
                               </button>
                               <button
                                 onClick={() => handleEditAttempt(attempt)}
-                                className="px-3 py-1.5 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
+                                className="w-full px-2 py-1 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteAttempt(attempt.id)}
-                                className="px-3 py-1.5 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
+                                className="w-full px-2 py-1 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
                               >
                                 Delete
                               </button>
@@ -477,25 +472,51 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
                         {/* Десктопная строка */}
                         <div className="hidden md:grid md:grid-cols-12">
                           {/* Кандидат */}
-                          <div className="col-span-3 p-4">
+                          <div className="col-span-2 p-4">
                             <div className="text-neutral-700 text-sm font-medium">
                               {getCandidateName(attempt)}
                             </div>
                             <div className="text-neutral-500 text-xs mt-1">
-                              {attempt.candidate?.email || 'No email'}
+                              {attempt.candidate_email || 'No email'}
                             </div>
                           </div>
 
                           {/* Тест */}
-                          <div className="col-span-4 p-4">
+                          <div className="col-span-2 p-4">
                             <div className="text-neutral-700 text-sm font-normal">
                               {getTestName(attempt)}
                             </div>
                             <div className="text-neutral-500 text-xs mt-1">
-                              {attempt.test?.time_limit
-                                ? `${attempt.test.time_limit} min`
+                              {attempt.test_time_limit
+                                ? `${attempt.test_time_limit} min`
                                 : 'No time limit'}
                             </div>
+                          </div>
+
+                          {/* Ссылка на тест */}
+                          <div className="col-span-2 p-4">
+                            <div className="text-neutral-500 text-xs break-all">
+                              <a
+                                href={`/test/${attempt.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 hover:underline"
+                                title={`${window.location.origin}/test/${attempt.id}`}
+                              >
+                                /test/{attempt.id?.slice(0, 8)}...
+                              </a>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const link = `${window.location.origin}/test/${attempt.id}`
+                                navigator.clipboard.writeText(link)
+                                alert('Link copied!')
+                              }}
+                              className="mt-1 px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300 transition-colors"
+                            >
+                              Copy
+                            </button>
                           </div>
 
                           {/* Статус */}
@@ -528,27 +549,14 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
                             </div>
                           </div>
 
-                          {/* Оценка */}
-                          <div className="col-span-1 p-4">
-                            <div className="text-neutral-700 text-sm font-normal">
-                              {attempt.score !== null
-                                ? `${attempt.score}%`
-                                : 'N/A'}
-                            </div>
-                            {attempt.time_spent && (
-                              <div className="text-neutral-500 text-xs mt-1">
-                                {Math.floor(attempt.time_spent / 60)} min
-                              </div>
-                            )}
-                          </div>
 
                           {/* Действия */}
-                          <div className="col-span-2 p-4">
-                            <div className="flex flex-wrap gap-1">
+                          <div className="col-span-4 p-4">
+                            <div className="flex flex-col gap-1">
                               {!attempt.completed && (
                                 <button
                                   onClick={() => handleResendAttempt(attempt)}
-                                  className="px-2 py-1 bg-blue-600 rounded text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+                                  className="w-full px-2 py-1 bg-blue-600 rounded text-white text-xs font-medium hover:bg-blue-700 transition-colors"
                                   title="Resend"
                                 >
                                   Resend
@@ -556,21 +564,21 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
                               )}
                               <button
                                 onClick={() => handleViewDetails(attempt)}
-                                className="px-2 py-1 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
+                                className="w-full px-2 py-1 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
                                 title="View Details"
                               >
                                 Details
                               </button>
                               <button
                                 onClick={() => handleEditAttempt(attempt)}
-                                className="px-2 py-1 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
+                                className="w-full px-2 py-1 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
                                 title="Edit"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteAttempt(attempt.id)}
-                                className="px-2 py-1 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
+                                className="w-full px-2 py-1 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
                                 title="Delete"
                               >
                                 Delete
@@ -657,57 +665,10 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
                   </select>
                 </div>
 
-                {/* Ссылка */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-neutral-700 text-sm font-medium">
-                      Unique Link
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleGenerateLink}
-                      className="text-xs text-blue-600 hover:text-blue-800"
-                    >
-                      Generate Link
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    name="unique_link"
-                    value={newAttempt.unique_link}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg border border-zinc-200 text-neutral-700 text-sm"
-                    placeholder="Unique link will be generated automatically"
-                    required
-                  />
-                  {newAttempt.unique_link && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Test URL: {window.location.origin}/test/
-                      {newAttempt.unique_link}
-                    </div>
-                  )}
-                </div>
 
-                {/* Отправка email */}
-                <div className="flex items-center space-x-3 pt-4">
-                  <input
-                    type="checkbox"
-                    id="send_email"
-                    name="send_email"
-                    checked={newAttempt.send_email}
-                    onChange={handleInputChange}
-                    className="w-5 h-5 rounded border border-zinc-300"
-                  />
-                  <label
-                    htmlFor="send_email"
-                    className="text-neutral-700 text-sm font-medium"
-                  >
-                    Send test link to candidate's email
-                  </label>
-                </div>
 
                 {/* Кнопки */}
-                <div className="flex justify-center gap-4 pt-6">
+                <div className="flex justify-center gap-4 pt-4">
                   <button
                     type="button"
                     onClick={handleClearForm}
@@ -719,11 +680,7 @@ Time Spent: ${attempt.time_spent ? `${Math.floor(attempt.time_spent / 60)} min $
                   <button
                     type="submit"
                     className="px-6 py-2 bg-slate-500 rounded-lg text-white text-sm font-medium hover:bg-slate-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    disabled={
-                      !newAttempt.candidate ||
-                      !newAttempt.test ||
-                      !newAttempt.unique_link
-                    }
+                    disabled={!newAttempt.candidate || !newAttempt.test}
                   >
                     Create Attempt
                   </button>

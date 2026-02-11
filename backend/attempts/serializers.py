@@ -40,6 +40,11 @@ class AnswerSerializer(serializers.ModelSerializer):
             "auto_score",
             "manual_score",
         ]
+        read_only_fields = [
+            "id", 
+            "auto_score", 
+            "question_text",
+        ]
 
 
 class AdminAttemptSerializer(serializers.ModelSerializer):
@@ -62,6 +67,12 @@ class AdminAttemptSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    test_time_limit = serializers.IntegerField(
+        source="test.time_limit",
+        read_only=True,
+        required=False,
+    )
+
     candidate_name = serializers.CharField(
         source="candidate.full_name",
         read_only=True,
@@ -75,7 +86,7 @@ class AdminAttemptSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attempt
         fields = [
-            "unique_link",
+            "id",
             "sent",
             "completed",
             "candidate",
@@ -83,14 +94,12 @@ class AdminAttemptSerializer(serializers.ModelSerializer):
             "candidate_email",
             "test",
             "test_title",
+            "test_time_limit",
             "activity",
             "answers",
             "last_send",
             "manual_score_percent",
             "auto_score_percent",
-        ]
-        read_only_fields = [
-            "unique_link",
         ]
 
 
@@ -99,11 +108,7 @@ class CandidateAttemptSerializer(serializers.ModelSerializer):
     Сериализатор данных о тесте для предоставления кандидату.
     """
 
-    questions = QuestionSerializer(
-        source="test.questions",
-        many=True,
-        read_only=True,
-    )
+    questions = serializers.SerializerMethodField()
 
     time_limit = serializers.IntegerField(
         source="test.time_limit",
@@ -113,11 +118,23 @@ class CandidateAttemptSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attempt
         fields = [
-            "unique_link",
+            "id",
             "questions",
             "time_limit",
             "completed",
         ]
+
+    def get_questions(self, instance):
+        test_questions = instance.test.test_questions.all().select_related("question").order_by("order")
+        questions = [test_question.question for test_question in test_questions]
+        serializer = QuestionSerializer(
+            questions, 
+            many=True, 
+            context={
+                "hide_correct_answers": True,
+            },
+        )
+        return serializer.data
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -145,6 +162,11 @@ class ResultsSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    activity = ActivityLogSerializer(
+        many=True,
+        read_only=True,
+    )
+
     class Meta:
         model = Attempt
         fields = [
@@ -156,4 +178,5 @@ class ResultsSerializer(serializers.ModelSerializer):
             "last_send",
             "completed_at",
             "answers",
+            "activity",
         ]

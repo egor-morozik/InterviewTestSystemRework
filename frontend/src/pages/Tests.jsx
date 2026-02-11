@@ -89,7 +89,7 @@ export function Tests() {
         description: newTest.description,
         time_limit: newTest.time_limit ? parseInt(newTest.time_limit) : null,
         test_questions: newTest.test_questions.map((questionId) => ({
-          question: questionId,
+          question_id: questionId,
           order: newTest.test_questions.indexOf(questionId) + 1,
         })),
       }
@@ -250,7 +250,7 @@ Last Updated: ${new Date(test.updated_at).toLocaleDateString()}
               {/* Таблица тестов */}
               <div className="overflow-x-auto">
                 {/* Заголовки таблицы */}
-                <div className="grid grid-cols-12 bg-gray-50 border-b border-zinc-200 min-w-200">
+                <div className="grid grid-cols-12 bg-gray-50 border-b border-zinc-200">
                   <div className="col-span-12 md:col-span-3 p-4">
                     <span className="text-neutral-700 text-sm font-bold font-['Inter']">
                       Test
@@ -269,7 +269,7 @@ Last Updated: ${new Date(test.updated_at).toLocaleDateString()}
                 </div>
 
                 {/* Список тестов */}
-                <div className="min-w-200">
+                <div>
                   {loading ? (
                     <div className="text-center py-8 text-gray-500">
                       Loading tests...
@@ -308,24 +308,24 @@ Last Updated: ${new Date(test.updated_at).toLocaleDateString()}
 
                         {/* Кнопки действий */}
                         <div className="col-span-12 md:col-span-3 p-4">
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-col gap-2">
                             <button
                               onClick={() => handleViewDetails(test)}
-                              className="px-3 py-2 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
+                              className="w-full px-2 py-1 bg-purple-800 rounded text-white text-xs font-medium hover:bg-purple-900 transition-colors"
                               title="View Details"
                             >
-                              Detail
+                              Details
                             </button>
                             <button
                               onClick={() => handleEditTest(test)}
-                              className="px-3 py-2 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
+                              className="w-full px-2 py-1 bg-slate-500 rounded text-white text-xs font-medium hover:bg-slate-600 transition-colors"
                               title="Edit"
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => handleDeleteTest(test.id)}
-                              className="px-3 py-2 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
+                              className="w-full px-2 py-1 bg-pink-800 rounded text-white text-xs font-medium hover:bg-pink-900 transition-colors"
                               title="Delete"
                             >
                               Delete

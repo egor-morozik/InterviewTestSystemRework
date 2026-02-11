@@ -74,7 +74,7 @@ class Question(models.Model):
         all_choices = self.choices.all()
         match self.question_type:
             case self.QuestionType.SINGLE_CHOICE:
-                choice = next((c.txt for c in all_choices if c.is_correct), None)
+                choice = next((c.text for c in all_choices if c.is_correct), None)
                 return choice.id if choice else None
             case self.QuestionType.MULTIPLE_CHOICE:
                 return sorted([c.text for c in all_choices if c.is_correct])
